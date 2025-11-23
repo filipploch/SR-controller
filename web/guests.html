@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zarządzanie Gośćmi</title>
+    <link rel="stylesheet" href="/static/css/shared.css">
+    <style>
+        .content {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 8px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .panel-header h2 {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #aaa;
+        }
+
+        .list-item {
+            padding: 6px 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+        }
+
+        .list-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .list-item-name {
+            flex: 1;
+        }
+
+        .list-item-type {
+            color: #888;
+            font-size: 9px;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Zarządzanie Gośćmi</h1>
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-dot connected"></div>
+                    <span>System</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Panel typów -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Typy Gości</h2>
+                    <button class="btn btn-primary btn-small" onclick="openTypeModal()">+ Typ</button>
+                </div>
+                <div class="scrollable" id="typesContainer">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+            </div>
+
+            <!-- Panel gości -->
+            <div class="panel" style="flex: 2;">
+                <div class="panel-header">
+                    <h2>Goście</h2>
+                    <button class="btn btn-primary btn-small" onclick="openGuestModal()">+ Gość</button>
+                </div>
+                <div class="scrollable" id="guestsContainer">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal dla typu -->
+    <div class="modal" id="typeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="typeModalTitle">Nowy Typ Gościa</h2>
+                <button class="modal-close" onclick="closeTypeModal()">&times;</button>
+            </div>
+            <form id="typeForm">
+                <input type="hidden" id="typeId">
+                <div class="form-group">
+                    <label for="typeName">Nazwa *</label>
+                    <input type="text" class="form-control" id="typeName" required placeholder="np. Ekspert, Artysta">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeTypeModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal dla gościa -->
+    <div class="modal" id="guestModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="guestModalTitle">Nowy Gość</h2>
+                <button class="modal-close" onclick="closeGuestModal()">&times;</button>
+            </div>
+            <form id="guestForm">
+                <input type="hidden" id="guestId">
+                <div class="form-group">
+                    <label for="guestType">Typ *</label>
+                    <select class="form-control" id="guestType" required>
+                        <option value="">Wybierz typ...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="guestFirstName">Imię *</label>
+                    <input type="text" class="form-control" id="guestFirstName" required>
+                </div>
+                <div class="form-group">
+                    <label for="guestLastName">Nazwisko *</label>
+                    <input type="text" class="form-control" id="guestLastName" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeGuestModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let types = [];
+        let guests = [];
+
+        // === TYPY ===
+        async function loadTypes() {
+            try {
+                const response = await fetch('/api/guest-types');
+                types = await response.json();
+                renderTypes();
+                updateTypeSelect();
+            } catch (error) {
+                console.error('Błąd ładowania typów:', error);
+            }
+        }
+
+        function renderTypes() {
+            const container = document.getElementById('typesContainer');
+            if (types.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><div>Brak typów</div></div>';
+                return;
+            }
+
+            container.innerHTML = types.map(type => `
+                <div class="list-item">
+                    <div class="list-item-name"><strong>${type.name}</strong></div>
+                    <div class="table-actions">
+                        <button class="btn btn-primary btn-small" onclick="editType(${type.id})">Edytuj</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteType(${type.id})">Usuń</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openTypeModal() {
+            document.getElementById('typeModalTitle').textContent = 'Nowy Typ Gościa';
+            document.getElementById('typeForm').reset();
+            document.getElementById('typeId').value = '';
+            document.getElementById('typeModal').classList.add('active');
+        }
+
+        function editType(id) {
+            const type = types.find(t => t.id === id);
+            if (!type) return;
+
+            document.getElementById('typeModalTitle').textContent = 'Edycja Typu';
+            document.getElementById('typeId').value = type.id;
+            document.getElementById('typeName').value = type.name;
+            document.getElementById('typeModal').classList.add('active');
+        }
+
+        function closeTypeModal() {
+            document.getElementById('typeModal').classList.remove('active');
+        }
+
+        document.getElementById('typeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('typeId').value;
+            const data = {
+                name: document.getElementById('typeName').value
+            };
+
+            try {
+                const url = id ? `/api/guest-types/${id}` : '/api/guest-types';
+                const method = id ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    closeTypeModal();
+                    loadTypes();
+                } else {
+                    const error = await response.text();
+                    alert('Błąd: ' + error);
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+                alert('Błąd połączenia');
+            }
+        });
+
+        async function deleteType(id) {
+            if (!confirm('Czy na pewno usunąć ten typ?')) return;
+
+            try {
+                const response = await fetch(`/api/guest-types/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadTypes();
+                } else {
+                    const error = await response.text();
+                    alert('Błąd: ' + error);
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+            }
+        }
+
+        // === GOŚCIE ===
+        async function loadGuests() {
+            try {
+                const response = await fetch('/api/guests');
+                guests = await response.json();
+                renderGuests();
+            } catch (error) {
+                console.error('Błąd ładowania gości:', error);
+            }
+        }
+
+        function renderGuests() {
+            const container = document.getElementById('guestsContainer');
+            if (guests.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👥</div><div>Brak gości</div></div>';
+                return;
+            }
+
+            container.innerHTML = guests.map(guest => `
+                <div class="list-item">
+                    <div class="list-item-name">
+                        <strong>${guest.first_name} ${guest.last_name}</strong>
+                    </div>
+                    <div class="list-item-type">${guest.guest_type?.name || '-'}</div>
+                    <div class="table-actions">
+                        <button class="btn btn-primary btn-small" onclick="editGuest(${guest.id})">Edytuj</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteGuest(${guest.id})">Usuń</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateTypeSelect() {
+            const select = document.getElementById('guestType');
+            select.innerHTML = '<option value="">Wybierz typ...</option>' +
+                types.map(type => `<option value="${type.id}">${type.name}</option>`).join('');
+        }
+
+        function openGuestModal() {
+            document.getElementById('guestModalTitle').textContent = 'Nowy Gość';
+            document.getElementById('guestForm').reset();
+            document.getElementById('guestId').value = '';
+            document.getElementById('guestModal').classList.add('active');
+        }
+
+        function editGuest(id) {
+            const guest = guests.find(g => g.id === id);
+            if (!guest) return;
+
+            document.getElementById('guestModalTitle').textContent = 'Edycja Gościa';
+            document.getElementById('guestId').value = guest.id;
+            document.getElementById('guestType').value = guest.guest_type_id;
+            document.getElementById('guestFirstName').value = guest.first_name;
+            document.getElementById('guestLastName').value = guest.last_name;
+            document.getElementById('guestModal').classList.add('active');
+        }
+
+        function closeGuestModal() {
+            document.getElementById('guestModal').classList.remove('active');
+        }
+
+        document.getElementById('guestForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('guestId').value;
+            const data = {
+                guest_type_id: parseInt(document.getElementById('guestType').value),
+                first_name: document.getElementById('guestFirstName').value,
+                last_name: document.getElementById('guestLastName').value
+            };
+
+            try {
+                const url = id ? `/api/guests/${id}` : '/api/guests';
+                const method = id ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    closeGuestModal();
+                    loadGuests();
+                } else {
+                    const error = await response.text();
+                    alert('Błąd: ' + error);
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+                alert('Błąd połączenia');
+            }
+        });
+
+        async function deleteGuest(id) {
+            if (!confirm('Czy na pewno usunąć tego gościa?')) return;
+
+            try {
+                const response = await fetch(`/api/guests/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadGuests();
+                } else {
+                    const error = await response.text();
+                    alert('Błąd: ' + error);
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+            }
+        }
+
+        // Inicjalizacja
+        loadTypes();
+        loadGuests();
+    </script>
+</body>
+</html>

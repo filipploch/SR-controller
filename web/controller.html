@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kontroler OBS</title>
+    <link rel="stylesheet" href="/static/css/controller.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Kontroler OBS</h1>
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-dot" id="socketStatus"></div>
+                    <span>Socket.IO</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-dot" id="obsStatus"></div>
+                    <span>OBS</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="scenes-grid">
+            <div class="scene-panel" data-scene="KAMERY">
+                <h3>Kamery</h3>
+                <div class="sources-list" id="sources-kamery">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+                <button class="save-order-btn" id="save-kamery" onclick="saveSourceOrder('KAMERY')">💾 Zapisz</button>
+            </div>
+
+            <div class="scene-panel" data-scene="MEDIA">
+                <h3>Media</h3>
+                <div class="sources-list" id="sources-media">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+                <button class="save-order-btn" id="save-media" onclick="saveSourceOrder('MEDIA')">💾 Zapisz</button>
+            </div>
+
+            <div class="scene-panel" data-scene="REPORTAZE">
+                <h3>Reportaże</h3>
+                <div class="sources-list" id="sources-reportaze">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+                <button class="save-order-btn" id="save-reportaze" onclick="saveSourceOrder('REPORTAZE')">💾 Zapisz</button>
+            </div>
+
+            <div class="scene-panel" data-scene="MIKROFONY">
+                <h3>Mikrofony</h3>
+                <div class="sources-list" id="sources-mikrofony">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+                <button class="save-order-btn" id="save-mikrofony" onclick="saveSourceOrder('MIKROFONY')">💾 Zapisz</button>
+            </div>
+
+            <div class="scene-panel" data-scene="MUZYKA">
+                <h3>Muzyka</h3>
+                <div class="sources-list" id="sources-muzyka">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+                <button class="save-order-btn" id="save-muzyka" onclick="saveSourceOrder('MUZYKA')">💾 Zapisz</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/socket.io.min.js"></script>
+    <script src="/static/js/controller.js"></script>
+</body>
+</html>

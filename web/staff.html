@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zarządzanie Ekipą</title>
+    <link rel="stylesheet" href="/static/css/shared.css">
+    <style>
+        .content {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 8px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .panel-header h2 {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #aaa;
+        }
+
+        .list-item {
+            padding: 6px 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+        }
+
+        .list-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .list-item-name {
+            flex: 1;
+        }
+
+        .list-item-type {
+            color: #888;
+            font-size: 9px;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Zarządzanie Ekipą</h1>
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-dot connected"></div>
+                    <span>System</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Panel typów -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Typy Ekipy</h2>
+                    <button class="btn btn-primary btn-small" onclick="openTypeModal()">+ Typ</button>
+                </div>
+                <div class="scrollable" id="typesContainer">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+            </div>
+
+            <!-- Panel pracowników -->
+            <div class="panel" style="flex: 2;">
+                <div class="panel-header">
+                    <h2>Członkowie Ekipy</h2>
+                    <button class="btn btn-primary btn-small" onclick="openStaffModal()">+ Osoba</button>
+                </div>
+                <div class="scrollable" id="staffContainer">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal dla typu -->
+    <div class="modal" id="typeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="typeModalTitle">Nowy Typ Ekipy</h2>
+                <button class="modal-close" onclick="closeTypeModal()">&times;</button>
+            </div>
+            <form id="typeForm">
+                <input type="hidden" id="typeId">
+                <div class="form-group">
+                    <label for="typeName">Nazwa *</label>
+                    <input type="text" class="form-control" id="typeName" required placeholder="np. Redaktor prowadzący">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeTypeModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal dla pracownika -->
+    <div class="modal" id="staffModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="staffModalTitle">Nowa Osoba</h2>
+                <button class="modal-close" onclick="closeStaffModal()">&times;</button>
+            </div>
+            <form id="staffForm">
+                <input type="hidden" id="staffId">
+                <div class="form-group">
+                    <label for="staffType">Typ *</label>
+                    <select class="form-control" id="staffType" required>
+                        <option value="">Wybierz typ...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="staffFirstName">Imię *</label>
+                    <input type="text" class="form-control" id="staffFirstName" required>
+                </div>
+                <div class="form-group">
+                    <label for="staffLastName">Nazwisko *</label>
+                    <input type="text" class="form-control" id="staffLastName" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeStaffModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let types = [];
+        let staff = [];
+
+        // === TYPY ===
+        async function loadTypes() {
+            try {
+                const response = await fetch('/api/staff-types');
+                types = await response.json();
+                renderTypes();
+                updateTypeSelect();
+            } catch (error) {
+                console.error('Błąd ładowania typów:', error);
+            }
+        }
+
+        function renderTypes() {
+            const container = document.getElementById('typesContainer');
+            if (types.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><div>Brak typów</div></div>';
+                return;
+            }
+
+            container.innerHTML = types.map(type => `
+                <div class="list-item">
+                    <div class="list-item-name"><strong>${type.name}</strong></div>
+                    <div class="table-actions">
+                        <button class="btn btn-primary btn-small" onclick="editType(${type.id})">Edytuj</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteType(${type.id})">Usuń</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openTypeModal() {
+            document.getElementById('typeModalTitle').textContent = 'Nowy Typ Ekipy';
+            document.getElementById('typeForm').reset();
+            document.getElementById('typeId').value = '';
+            document.getElementById('typeModal').classList.add('active');
+        }
+
+        function editType(id) {
+            const type = types.find(t => t.id === id);
+            if (!type) return;
+
+            document.getElementById('typeModalTitle').textContent = 'Edycja Typu';
+            document.getElementById('typeId').value = type.id;
+            document.getElementById('typeName').value = type.name;
+            document.getElementById('typeModal').classList.add('active');
+        }
+
+        function closeTypeModal() {
+            document.getElementById('typeModal').classList.remove('active');
+        }
+
+        document.getElementById('typeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('typeId').value;
+            const data = {
+                name: document.getElementById('typeName').value
+            };
+
+            try {
+                const url = id ? `/api/staff-types/${id}` : '/api/staff-types';
+                const method = id ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    closeTypeModal();
+                    loadTypes();
+                } else {
+                    const error = await response.text();
+                    alert('Błąd: ' + error);
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+                alert('Błąd połączenia');
+            }
+        });
+
+        async function deleteType(id) {
+            if (!confirm('Czy na pewno usunąć ten typ?')) return;
+
+            try {
+                const response = await fetch(`/api/staff-types/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadTypes();
+                } else {
+                    const error = await response.text();
+                    alert('Błąd: ' + error);
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+            }
+        }
+
+        // === PRACOWNICY ===
+        async function loadStaff() {
+            try {
+                const response = await fetch('/api/staff');
+                staff = await response.json();
+                renderStaff();
+            } catch (error) {
+                console.error('Błąd ładowania pracowników:', error);
+            }
+        }
+
+        function renderStaff() {
+            const container = document.getElementById('staffContainer');
+            if (staff.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👥</div><div>Brak osób</div></div>';
+                return;
+            }
+
+            container.innerHTML = staff.map(person => `
+                <div class="list-item">
+                    <div class="list-item-name">
+                        <strong>${person.first_name} ${person.last_name}</strong>
+                    </div>
+                    <div class="list-item-type">${person.staff_type?.name || '-'}</div>
+                    <div class="table-actions">
+                        <button class="btn btn-primary btn-small" onclick="editStaff(${person.id})">Edytuj</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteStaff(${person.id})">Usuń</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateTypeSelect() {
+            const select = document.getElementById('staffType');
+            select.innerHTML = '<option value="">Wybierz typ...</option>' +
+                types.map(type => `<option value="${type.id}">${type.name}</option>`).join('');
+        }
+
+        function openStaffModal() {
+            document.getElementById('staffModalTitle').textContent = 'Nowa Osoba';
+            document.getElementById('staffForm').reset();
+            document.getElementById('staffId').value = '';
+            document.getElementById('staffModal').classList.add('active');
+        }
+
+        function editStaff(id) {
+            const person = staff.find(s => s.id === id);
+            if (!person) return;
+
+            document.getElementById('staffModalTitle').textContent = 'Edycja Osoby';
+            document.getElementById('staffId').value = person.id;
+            document.getElementById('staffType').value = person.staff_type_id;
+            document.getElementById('staffFirstName').value = person.first_name;
+            document.getElementById('staffLastName').value = person.last_name;
+            document.getElementById('staffModal').classList.add('active');
+        }
+
+        function closeStaffModal() {
+            document.getElementById('staffModal').classList.remove('active');
+        }
+
+        document.getElementById('staffForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('staffId').value;
+            const data = {
+                staff_type_id: parseInt(document.getElementById('staffType').value),
+                first_name: document.getElementById('staffFirstName').value,
+                last_name: document.getElementById('staffLastName').value
+            };
+
+            try {
+                const url = id ? `/api/staff/${id}` : '/api/staff';
+                const method = id ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    closeStaffModal();
+                    loadStaff();
+                } else {
+                    const error = await response.text();
+                    alert('Błąd: ' + error);
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+                alert('Błąd połączenia');
+            }
+        });
+
+        async function deleteStaff(id) {
+            if (!confirm('Czy na pewno usunąć tę osobę?')) return;
+
+            try {
+                const response = await fetch(`/api/staff/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadStaff();
+                } else {
+                    const error = await response.text();
+                    alert('Błąd: ' + error);
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+            }
+        }
+
+        // Inicjalizacja
+        loadTypes();
+        loadStaff();
+    </script>
+</body>
+</html>

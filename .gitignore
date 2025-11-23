@@ -1,0 +1,38 @@
+# Pliki binarne i wykonywalne
+*.exe
+*.exe~
+
+# Pliki binarne specyficzne dla Go
+/bin/
+/dist/
+
+# Pliki bazy danych
+*.db
+
+# Środowisko programisty
+/.vscode/
+
+# Pliki systemowe
+.DS_Store
+Thumbs.db
+
+# Pliki logów
+*.log
+
+# Pliki konfiguracyjne (jeśli zawierają wrażliwe dane)
+.env
+.env.local
+config.local.yaml
+
+# Katalog cache Go
+/.cache/
+
+# Katalog dependencies (nie commitować vendor/ jeśli nie używasz vendoringu)
+/vendor/  # opcjonalnie - usuń jeśli używasz vendoringu
+
+# Katalog tymczasowy
+/tmp/
+
+# Pliki coverage
+coverage.txt
+profile.out

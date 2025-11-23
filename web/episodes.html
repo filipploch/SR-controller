@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zarządzanie Odcinkami</title>
+    <link rel="stylesheet" href="/static/css/shared.css">
+    <style>
+        .content {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .filter-group select {
+            width: 150px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Zarządzanie Odcinkami</h1>
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-dot connected"></div>
+                    <span>System</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="toolbar">
+                <div class="filter-group">
+                    <label style="font-size: 10px; color: #aaa;">Sezon:</label>
+                    <select class="form-control" id="seasonFilter" onchange="loadEpisodes()">
+                        <option value="">Wszystkie</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary btn-small" onclick="openCreateModal()">+ Nowy Odcinek</button>
+            </div>
+
+            <div class="scrollable">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">Nr</th>
+                            <th style="width: 60px;">Sezon</th>
+                            <th>Tytuł</th>
+                            <th style="width: 100px;">Data</th>
+                            <th style="width: 80px;">Status</th>
+                            <th style="width: 140px;">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody id="episodesTableBody">
+                        <tr>
+                            <td colspan="6" class="loading">Ładowanie...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal tworzenia/edycji -->
+    <div class="modal" id="episodeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Nowy Odcinek</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="episodeForm">
+                <input type="hidden" id="episodeId">
+                <div class="form-group">
+                    <label for="episodeSeason">Sezon *</label>
+                    <select class="form-control" id="episodeSeason" required>
+                        <option value="">Wybierz sezon...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="episodeNumber">Numer Odcinka (ciągły) *</label>
+                    <input type="number" class="form-control" id="episodeNumber" required min="1">
+                </div>
+                <div class="form-group">
+                    <label for="seasonEpisode">Numer w Sezonie *</label>
+                    <input type="number" class="form-control" id="seasonEpisode" required min="1">
+                </div>
+                <div class="form-group">
+                    <label for="episodeTitle">Tytuł *</label>
+                    <input type="text" class="form-control" id="episodeTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="episodeDate">Data Odcinka</label>
+                    <input type="date" class="form-control" id="episodeDate">
+                </div>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="episodeIsCurrent">
+                        <label for="episodeIsCurrent">Ustaw jako aktualny odcinek</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let episodes = [];
+        let seasons = [];
+
+        // Ładowanie sezonów
+        async function loadSeasons() {
+            try {
+                const response = await fetch('/api/seasons');
+                seasons = await response.json();
+                updateSeasonSelects();
+            } catch (error) {
+                console.error('Błąd ładowania sezonów:', error);
+            }
+        }
+
+        function updateSeasonSelects() {
+            // Filtr
+            const filterSelect = document.getElementById('seasonFilter');
+            filterSelect.innerHTML = '<option value="">Wszystkie</option>' +
+                seasons.map(s => `<option value="${s.id}">Sezon ${s.number}</option>`).join('');
+
+            // Modal
+            const modalSelect = document.getElementById('episodeSeason');
+            modalSelect.innerHTML = '<option value="">Wybierz sezon...</option>' +
+                seasons.map(s => `<option value="${s.id}">Sezon ${s.number}${s.is_current ? ' (aktualny)' : ''}</option>`).join('');
+        }
+
+        // Ładowanie odcinków
+        async function loadEpisodes() {
+            try {
+                const seasonId = document.getElementById('seasonFilter').value;
+                const url = seasonId ? `/api/episodes?season_id=${seasonId}` : '/api/episodes';
+                const response = await fetch(url);
+                episodes = await response.json();
+                renderEpisodes();
+            } catch (error) {
+                console.error('Błąd ładowania odcinków:', error);
+            }
+        }
+
+        // Renderowanie tabeli
+        function renderEpisodes() {
+            const tbody = document.getElementById('episodesTableBody');
+            
+            if (episodes.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📺</div>
+                                <div>Brak odcinków. Utwórz pierwszy odcinek.</div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = episodes.map(episode => {
+                const date = episode.episode_date ? new Date(episode.episode_date).toLocaleDateString('pl-PL') : '-';
+                const season = episode.season ? episode.season.number : '-';
+                
+                return `
+                    <tr>
+                        <td><strong>${episode.episode_number}</strong></td>
+                        <td>S${season}E${episode.season_episode}</td>
+                        <td>${episode.title}</td>
+                        <td>${date}</td>
+                        <td>
+                            ${episode.is_current ? '<span class="badge badge-success">Aktualny</span>' : '<span class="badge badge-secondary">-</span>'}
+                        </td>
+                        <td>
+                            <div class="table-actions">
+                                ${!episode.is_current ? `<button class="btn btn-success btn-small" onclick="setCurrentEpisode(${episode.id})">Aktywuj</button>` : ''}
+                                <button class="btn btn-primary btn-small" onclick="openEditModal(${episode.id})">Edytuj</button>
+                                <button class="btn btn-danger btn-small" onclick="deleteEpisode(${episode.id})">Usuń</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Otwórz modal tworzenia
+        function openCreateModal() {
+            document.getElementById('modalTitle').textContent = 'Nowy Odcinek';
+            document.getElementById('episodeForm').reset();
+            document.getElementById('episodeId').value = '';
+            document.getElementById('episodeModal').classList.add('active');
+        }
+
+        // Otwórz modal edycji
+        function openEditModal(id) {
+            const episode = episodes.find(e => e.id === id);
+            if (!episode) return;
+
+            document.getElementById('modalTitle').textContent = 'Edycja Odcinka';
+            document.getElementById('episodeId').value = episode.id;
+            document.getElementById('episodeSeason').value = episode.season_id;
+            document.getElementById('episodeNumber').value = episode.episode_number;
+            document.getElementById('seasonEpisode').value = episode.season_episode;
+            document.getElementById('episodeTitle').value = episode.title;
+            
+            if (episode.episode_date) {
+                const date = new Date(episode.episode_date);
+                document.getElementById('episodeDate').value = date.toISOString().split('T')[0];
+            }
+            
+            document.getElementById('episodeIsCurrent').checked = episode.is_current;
+            document.getElementById('episodeModal').classList.add('active');
+        }
+
+        // Zamknij modal
+        function closeModal() {
+            document.getElementById('episodeModal').classList.remove('active');
+        }
+
+        // Zapisz odcinek
+        document.getElementById('episodeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('episodeId').value;
+            const dateValue = document.getElementById('episodeDate').value;
+            
+            const data = {
+                season_id: parseInt(document.getElementById('episodeSeason').value),
+                episode_number: parseInt(document.getElementById('episodeNumber').value),
+                season_episode: parseInt(document.getElementById('seasonEpisode').value),
+                title: document.getElementById('episodeTitle').value,
+                episode_date: dateValue ? new Date(dateValue).toISOString() : new Date().toISOString(),
+                is_current: document.getElementById('episodeIsCurrent').checked
+            };
+
+            try {
+                const url = id ? `/api/episodes/${id}` : '/api/episodes';
+                const method = id ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    closeModal();
+                    loadEpisodes();
+                } else {
+                    const error = await response.text();
+                    alert('Błąd zapisu odcinka: ' + error);
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+                alert('Błąd połączenia');
+            }
+        });
+
+        // Ustaw aktualny odcinek
+        async function setCurrentEpisode(id) {
+            if (!confirm('Czy na pewno chcesz ustawić ten odcinek jako aktualny?')) return;
+
+            try {
+                const response = await fetch(`/api/episodes/${id}/set-current`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    loadEpisodes();
+                } else {
+                    alert('Błąd ustawiania odcinka');
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+                alert('Błąd połączenia');
+            }
+        }
+
+        // Usuń odcinek
+        async function deleteEpisode(id) {
+            if (!confirm('Czy na pewno chcesz usunąć ten odcinek? Ta operacja jest nieodwracalna.')) return;
+
+            try {
+                const response = await fetch(`/api/episodes/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadEpisodes();
+                } else {
+                    const error = await response.text();
+                    alert('Błąd usuwania odcinka: ' + error);
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+                alert('Błąd połączenia');
+            }
+        }
+
+        // Inicjalizacja
+        loadSeasons();
+        loadEpisodes();
+    </script>
+</body>
+</html>

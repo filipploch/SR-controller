@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zarządzanie Sezonami</title>
+    <link rel="stylesheet" href="/static/css/shared.css">
+    <style>
+        .content {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Zarządzanie Sezonami</h1>
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-dot connected"></div>
+                    <span>System</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="toolbar">
+                <div></div>
+                <button class="btn btn-primary btn-small" onclick="openCreateModal()">+ Nowy Sezon</button>
+            </div>
+
+            <div class="scrollable">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">Numer</th>
+                            <th>Opis</th>
+                            <th style="width: 80px;">Status</th>
+                            <th style="width: 120px;">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody id="seasonsTableBody">
+                        <tr>
+                            <td colspan="4" class="loading">Ładowanie...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal tworzenia/edycji -->
+    <div class="modal" id="seasonModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Nowy Sezon</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="seasonForm">
+                <input type="hidden" id="seasonId">
+                <div class="form-group">
+                    <label for="seasonNumber">Numer Sezonu *</label>
+                    <input type="number" class="form-control" id="seasonNumber" required min="1">
+                </div>
+                <div class="form-group">
+                    <label for="seasonDescription">Opis</label>
+                    <textarea class="form-control" id="seasonDescription" placeholder="Opcjonalny opis sezonu..."></textarea>
+                </div>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="seasonIsCurrent">
+                        <label for="seasonIsCurrent">Ustaw jako aktualny sezon</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let seasons = [];
+
+        // Ładowanie sezonów
+        async function loadSeasons() {
+            try {
+                const response = await fetch('/api/seasons');
+                seasons = await response.json();
+                renderSeasons();
+            } catch (error) {
+                console.error('Błąd ładowania sezonów:', error);
+            }
+        }
+
+        // Renderowanie tabeli
+        function renderSeasons() {
+            const tbody = document.getElementById('seasonsTableBody');
+            
+            if (seasons.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📺</div>
+                                <div>Brak sezonów. Utwórz pierwszy sezon.</div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = seasons.map(season => `
+                <tr>
+                    <td><strong>${season.number}</strong></td>
+                    <td>${season.description || '<em style="color: #666;">Brak opisu</em>'}</td>
+                    <td>
+                        ${season.is_current ? '<span class="badge badge-success">Aktualny</span>' : '<span class="badge badge-secondary">-</span>'}
+                    </td>
+                    <td>
+                        <div class="table-actions">
+                            ${!season.is_current ? `<button class="btn btn-success btn-small" onclick="setCurrentSeason(${season.id})">Aktywuj</button>` : ''}
+                            <button class="btn btn-primary btn-small" onclick="openEditModal(${season.id})">Edytuj</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteSeason(${season.id})">Usuń</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Otwórz modal tworzenia
+        function openCreateModal() {
+            document.getElementById('modalTitle').textContent = 'Nowy Sezon';
+            document.getElementById('seasonForm').reset();
+            document.getElementById('seasonId').value = '';
+            document.getElementById('seasonModal').classList.add('active');
+        }
+
+        // Otwórz modal edycji
+        function openEditModal(id) {
+            const season = seasons.find(s => s.id === id);
+            if (!season) return;
+
+            document.getElementById('modalTitle').textContent = 'Edycja Sezonu';
+            document.getElementById('seasonId').value = season.id;
+            document.getElementById('seasonNumber').value = season.number;
+            document.getElementById('seasonDescription').value = season.description || '';
+            document.getElementById('seasonIsCurrent').checked = season.is_current;
+            document.getElementById('seasonModal').classList.add('active');
+        }
+
+        // Zamknij modal
+        function closeModal() {
+            document.getElementById('seasonModal').classList.remove('active');
+        }
+
+        // Zapisz sezon
+        document.getElementById('seasonForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById('seasonId').value;
+            const data = {
+                number: parseInt(document.getElementById('seasonNumber').value),
+                description: document.getElementById('seasonDescription').value,
+                is_current: document.getElementById('seasonIsCurrent').checked
+            };
+
+            try {
+                const url = id ? `/api/seasons/${id}` : '/api/seasons';
+                const method = id ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    closeModal();
+                    loadSeasons();
+                } else {
+                    alert('Błąd zapisu sezonu');
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+                alert('Błąd połączenia');
+            }
+        });
+
+        // Ustaw aktualny sezon
+        async function setCurrentSeason(id) {
+            if (!confirm('Czy na pewno chcesz ustawić ten sezon jako aktualny?')) return;
+
+            try {
+                const response = await fetch(`/api/seasons/${id}/set-current`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    loadSeasons();
+                } else {
+                    alert('Błąd ustawiania sezonu');
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+                alert('Błąd połączenia');
+            }
+        }
+
+        // Usuń sezon
+        async function deleteSeason(id) {
+            if (!confirm('Czy na pewno chcesz usunąć ten sezon? Ta operacja jest nieodwracalna.')) return;
+
+            try {
+                const response = await fetch(`/api/seasons/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadSeasons();
+                } else {
+                    alert('Błąd usuwania sezonu');
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+                alert('Błąd połączenia');
+            }
+        }
+
+        // Inicjalizacja
+        loadSeasons();
+    </script>
+</body>
+</html>

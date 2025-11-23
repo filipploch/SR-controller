@@ -1,0 +1,95 @@
+/* Dodatkowe style specyficzne dla kontrolera */
+
+.scenes-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    flex: 1;
+}
+
+.scene-panel {
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.scene-panel h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-align: center;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sources-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.source-btn {
+    padding: 6px 8px;
+    font-size: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.source-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.source-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+.source-btn.active:hover {
+    background: linear-gradient(135deg, #7c94f5 0%, #8b5db8 100%);
+}
+
+.save-order-btn {
+    padding: 4px 8px;
+    font-size: 9px;
+    background: rgba(255, 165, 0, 0.2);
+    border: 1px solid rgba(255, 165, 0, 0.5);
+    border-radius: 4px;
+    color: #ffa500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    margin-top: 4px;
+    display: none;
+}
+
+.save-order-btn.visible {
+    display: block;
+}
+
+.save-order-btn:hover {
+    background: rgba(255, 165, 0, 0.4);
+    border-color: #ffa500;
+}
+
+/* Kolory dla różnych scen */
+.scene-panel[data-scene="KAMERY"] h3 { color: #4fc3f7; }
+.scene-panel[data-scene="MEDIA"] h3 { color: #ffa726; }
+.scene-panel[data-scene="REPORTAZE"] h3 { color: #66bb6a; }
+.scene-panel[data-scene="MIKROFONY"] h3 { color: #ef5350; }
+.scene-panel[data-scene="MUZYKA"] h3 { color: #ab47bc; }
