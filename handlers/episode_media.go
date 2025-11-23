@@ -276,6 +276,7 @@ func (h *EpisodeMediaHandler) ListMediaFiles(w http.ResponseWriter, r *http.Requ
 	var files []map[string]interface{}
 
 	entries, err := os.ReadDir(dirPath)
+	fmt.Println(dirPath)
 	if err != nil {
 		// Folder nie istnieje, zwracamy pustą listę
 		w.Header().Set("Content-Type", "application/json")

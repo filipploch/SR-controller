@@ -267,6 +267,30 @@ func (c *Client) GetSceneItemList(sceneName string) ([]map[string]interface{}, e
 	return nil, fmt.Errorf("nie można pobrać listy źródeł")
 }
 
+// GetSceneList pobiera listę wszystkich scen z OBS
+func (c *Client) GetSceneList() ([]string, error) {
+	response, err := c.Request("GetSceneList", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if responseData, ok := response["responseData"].(map[string]interface{}); ok {
+		if scenes, ok := responseData["scenes"].([]interface{}); ok {
+			sceneNames := make([]string, 0, len(scenes))
+			for _, scene := range scenes {
+				if sceneMap, ok := scene.(map[string]interface{}); ok {
+					if sceneName, ok := sceneMap["sceneName"].(string); ok {
+						sceneNames = append(sceneNames, sceneName)
+					}
+				}
+			}
+			return sceneNames, nil
+		}
+	}
+
+	return nil, fmt.Errorf("nie można pobrać listy scen")
+}
+
 // SetSceneItemIndexByValue ustawia konkretny indeks dla źródła
 func (c *Client) SetSceneItemIndexByValue(sceneName, sourceName string, index int) error {
 	sceneItemID := c.getSceneItemID(sceneName, sourceName)

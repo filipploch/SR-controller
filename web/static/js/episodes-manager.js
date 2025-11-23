@@ -324,6 +324,7 @@ async function loadStaffTypes() {
 
 function updateStaffTypeSelect() {
     const select = document.getElementById('staffType');
+    if (!select) return; // Element nie istnieje w obecnym kontekście
     select.innerHTML = '<option value="">Wybierz typ...</option>' +
         staffTypes.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
 }
@@ -898,6 +899,15 @@ function updateMediaStaffSelect() {
         ).join('');
 }
 
+function updateMediaGroupSelect() {
+    const select = document.getElementById('mediaGroupSelect');
+    if (!select) return; // Element nie istnieje jeśli formularz nie jest otwarty
+    select.innerHTML = '<option value="">Nie przypisuj do grupy</option>' +
+        mediaGroups.map(group => 
+            `<option value="${group.id}">${group.name}</option>`
+        ).join('');
+}
+
 async function loadMediaFiles() {
     if (!currentEpisodeId) return;
     
@@ -934,6 +944,7 @@ function selectMediaFile(path, name, duration) {
     document.getElementById('mediaFileDuration').value = duration || 0;
     document.getElementById('mediaFileName').textContent = name;
     document.getElementById('mediaTitle').value = name.replace(/\.[^/.]+$/, ''); // Remove extension
+    updateMediaGroupSelect(); // Wypełnij select grup mediów
     openAssignMediaModal();
 }
 
@@ -954,6 +965,7 @@ async function assignMedia() {
 
     const filePath = document.getElementById('mediaFilePath').value;
     const staffId = document.getElementById('mediaStaff').value;
+    const groupId = document.getElementById('mediaGroupSelect').value;
     
     const data = {
         scene_id: parseInt(document.getElementById('mediaSource').value),
@@ -972,6 +984,24 @@ async function assignMedia() {
         });
 
         if (response.ok) {
+            const newMedia = await response.json();
+            
+            // Jeśli wybrano grupę, dodaj media do grupy
+            if (groupId) {
+                try {
+                    await fetch(`/api/media-groups/${groupId}/items`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            episode_media_id: newMedia.id
+                        })
+                    });
+                } catch (error) {
+                    console.error('Błąd dodawania do grupy:', error);
+                    // Nie przerywamy - media zostało przypisane, tylko nie dodane do grupy
+                }
+            }
+            
             closeAssignMediaModal();
             await loadAssignedMedia();
         } else {

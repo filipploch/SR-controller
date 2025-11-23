@@ -63,6 +63,10 @@ func main() {
 	episodeGuestHandler := handlers.NewEpisodeGuestHandler(db)
 	sceneHandler := handlers.NewSceneHandler(db)
 	mediaGroupHandler := handlers.NewMediaGroupHandler(db)
+	settingsHandler := handlers.NewSettingsHandler(db)
+
+	// Middleware do sprawdzania wymagań i inicjalizacji
+	initMiddleware := handlers.NewInitMiddleware(db, obsClient)
 
 	// Ścieżka do mediów
 	mediaPath := "./media"
@@ -87,8 +91,12 @@ func main() {
 	})
 
 	// Strony HTML
-	router.HandleFunc("/controller", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("/controller", initMiddleware.CheckRequirements(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./web/controller.html")
+	}))
+
+	router.HandleFunc("/settings", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./web/settings.html")
 	})
 
 	router.HandleFunc("/seasons", func(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +121,7 @@ func main() {
 
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
-			http.Redirect(w, r, "/controller", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
 			return
 		}
 		http.NotFound(w, r)
@@ -185,6 +193,9 @@ func main() {
 	api.HandleFunc("/scenes", sceneHandler.GetScenes).Methods("GET")
 	api.HandleFunc("/scenes/media", sceneHandler.GetMediaScenes).Methods("GET")
 
+	// API REST dla Settings
+	api.HandleFunc("/settings/status", settingsHandler.GetStatus).Methods("GET")
+
 	// API REST dla MediaGroup
 	api.HandleFunc("/media-groups", mediaGroupHandler.GetMediaGroups).Methods("GET")
 	api.HandleFunc("/media-groups", mediaGroupHandler.CreateMediaGroup).Methods("POST")
@@ -198,6 +209,7 @@ func main() {
 
 	log.Println("========================================")
 	log.Println("Serwer działa: http://localhost:8080")
+	log.Println("Ustawienia: http://localhost:8080/settings")
 	log.Println("Kontroler: http://localhost:8080/controller")
 	log.Println("Sezony: http://localhost:8080/seasons")
 	log.Println("Odcinki: http://localhost:8080/episodes")
