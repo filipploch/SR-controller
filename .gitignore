@@ -33,6 +33,9 @@ config.local.yaml
 # Katalog tymczasowy
 /tmp/
 
+# Katalog media
+/media/
+
 # Pliki coverage
 coverage.txt
 profile.out

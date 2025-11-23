@@ -29,6 +29,278 @@
         .filter-group select {
             width: 150px;
         }
+
+        /* Modal tabs */
+        .modal-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid #333;
+            margin-bottom: 15px;
+        }
+
+        .modal-tab {
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            color: #aaa;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .modal-tab:hover {
+            color: #fff;
+        }
+
+        .modal-tab.active {
+            color: #fff;
+            border-bottom-color: #007bff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Lists for staff/guests */
+        .assignment-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .assignment-list {
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .assignment-list h4 {
+            margin: 0 0 10px 0;
+            font-size: 12px;
+            color: #aaa;
+            text-transform: uppercase;
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            background: #1a1a1a;
+            border-radius: 3px;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+
+        .list-item:hover {
+            background: #252525;
+        }
+
+        .list-item-info {
+            flex: 1;
+        }
+
+        .list-item-type {
+            color: #666;
+            font-size: 10px;
+        }
+
+        .list-item-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .btn-icon {
+            padding: 2px 6px;
+            font-size: 11px;
+            min-width: auto;
+        }
+
+        /* Media section */
+        .media-files-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .media-file-card {
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .media-file-card:hover {
+            background: #1a1a1a;
+            border-color: #007bff;
+        }
+
+        .media-file-card.selected {
+            background: #1a1a1a;
+            border-color: #007bff;
+        }
+
+        .media-file-name {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 4px;
+            word-break: break-all;
+        }
+
+        .media-file-info {
+            font-size: 10px;
+            color: #666;
+        }
+
+        .assigned-media-list {
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .assigned-media-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 8px;
+            background: #1a1a1a;
+            border-radius: 3px;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+
+        .media-item-details {
+            flex: 1;
+        }
+
+        .media-item-title {
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .media-item-meta {
+            font-size: 10px;
+            color: #666;
+        }
+
+        .modal-content-large {
+            max-width: 900px;
+            width: 90vw;
+            max-height: 90vh;
+        }
+
+        .scrollable-tab {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .guest-extra-fields {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        /* Media Groups */
+        .media-group-card {
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #1a1a1a;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .media-group-card:hover {
+            border-color: #007bff;
+            background: #252525;
+        }
+
+        .media-group-card.active {
+            border-color: #66bb6a;
+            background: #1a2a1a;
+        }
+
+        .media-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .media-group-name {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .media-group-count {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .media-group-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .available-media-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background: #0a0a0a;
+            border-radius: 3px;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+
+        .available-media-item:hover {
+            background: #151515;
+        }
+
+        .group-media-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background: #0a0a0a;
+            border-radius: 3px;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+
+        .group-media-item:hover {
+            background: #151515;
+        }
+
+        .group-media-order {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .group-media-order input {
+            width: 50px;
+            padding: 2px 4px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #fff;
+            border-radius: 3px;
+            font-size: 11px;
+        }
     </style>
 </head>
 <body>
@@ -78,249 +350,397 @@
 
     <!-- Modal tworzenia/edycji -->
     <div class="modal" id="episodeModal">
-        <div class="modal-content">
+        <div class="modal-content modal-content-large">
             <div class="modal-header">
                 <h2 id="modalTitle">Nowy Odcinek</h2>
                 <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
-            <form id="episodeForm">
-                <input type="hidden" id="episodeId">
+
+            <!-- Zakładki -->
+            <div class="modal-tabs">
+                <button class="modal-tab active" onclick="switchTab('data')">Dane Odcinka</button>
+                <button class="modal-tab" onclick="switchTab('staff')">Ekipa</button>
+                <button class="modal-tab" onclick="switchTab('guests')">Goście</button>
+                <button class="modal-tab" onclick="switchTab('media')">Media</button>
+            </div>
+
+            <!-- Zakładka: Dane Odcinka -->
+            <div id="tabData" class="tab-content active">
+                <form id="episodeForm">
+                    <input type="hidden" id="episodeId">
+                    <div class="form-group">
+                        <label for="episodeSeason">Sezon *</label>
+                        <select class="form-control" id="episodeSeason" required>
+                            <option value="">Wybierz sezon...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="episodeNumber">Numer Odcinka (ciągły) *</label>
+                        <input type="number" class="form-control" id="episodeNumber" required min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="seasonEpisode">Numer w Sezonie *</label>
+                        <input type="number" class="form-control" id="seasonEpisode" required min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="episodeTitle">Tytuł *</label>
+                        <input type="text" class="form-control" id="episodeTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="episodeDate">Data Odcinka</label>
+                        <input type="date" class="form-control" id="episodeDate">
+                    </div>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="episodeIsCurrent">
+                            <label for="episodeIsCurrent">Ustaw jako aktualny odcinek</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Zakładka: Ekipa -->
+            <div id="tabStaff" class="tab-content">
+                <div class="scrollable-tab">
+                    <div style="margin-bottom: 15px; display: flex; gap: 8px;">
+                        <button class="btn btn-primary btn-small" onclick="openAddStaffModal()">+ Nowy Członek Ekipy</button>
+                        <button class="btn btn-secondary btn-small" onclick="openAddStaffTypeModal()">+ Nowy Typ Ekipy</button>
+                    </div>
+                    
+                    <div class="assignment-section">
+                        <div class="assignment-list">
+                            <h4>Dostępni</h4>
+                            <div id="availableStaffList"></div>
+                        </div>
+                        <div class="assignment-list">
+                            <h4>Przypisani do odcinka</h4>
+                            <div id="assignedStaffList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zakładka: Goście -->
+            <div id="tabGuests" class="tab-content">
+                <div class="scrollable-tab">
+                    <div style="margin-bottom: 15px; display: flex; gap: 8px;">
+                        <button class="btn btn-primary btn-small" onclick="openAddGuestModal()">+ Nowy Gość</button>
+                        <button class="btn btn-secondary btn-small" onclick="openAddGuestTypeModal()">+ Nowy Typ Gościa</button>
+                    </div>
+                    
+                    <div class="assignment-section">
+                        <div class="assignment-list">
+                            <h4>Dostępni</h4>
+                            <div id="availableGuestsList"></div>
+                        </div>
+                        <div class="assignment-list">
+                            <h4>Przypisani do odcinka</h4>
+                            <div id="assignedGuestsList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zakładka: Media -->
+            <div id="tabMedia" class="tab-content">
+                <div class="scrollable-tab">
+                    <div style="margin-bottom: 15px;">
+                        <h4 style="margin-bottom: 10px;">Dostępne pliki w folderze sezonu:</h4>
+                        <div class="media-files-grid" id="mediaFilesGrid">
+                            <div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #666;">
+                                Ładowanie...
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4>Przypisane media do odcinka:</h4>
+                        </div>
+                        <div class="assigned-media-list" id="assignedMediaList">
+                            <div style="text-align: center; padding: 20px; color: #666;">
+                                Brak przypisanych mediów
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4>Grupy Mediów (Playlisty):</h4>
+                            <button class="btn btn-primary btn-small" onclick="openAddMediaGroupModal()">+ Nowa Grupa</button>
+                        </div>
+                        <div id="mediaGroupsList">
+                            <div style="text-align: center; padding: 20px; color: #666;">
+                                Brak grup mediów
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal()">Zamknij</button>
+                <button type="button" class="btn btn-primary" onclick="saveEpisode()">Zapisz Odcinek</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal dodawania Staff -->
+    <div class="modal" id="addStaffModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nowy Członek Ekipy</h2>
+                <button class="modal-close" onclick="closeAddStaffModal()">&times;</button>
+            </div>
+            <form id="addStaffForm">
                 <div class="form-group">
-                    <label for="episodeSeason">Sezon *</label>
-                    <select class="form-control" id="episodeSeason" required>
-                        <option value="">Wybierz sezon...</option>
+                    <label for="staffFirstName">Imię *</label>
+                    <input type="text" class="form-control" id="staffFirstName" required>
+                </div>
+                <div class="form-group">
+                    <label for="staffLastName">Nazwisko *</label>
+                    <input type="text" class="form-control" id="staffLastName" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeAddStaffModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Dodaj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal dodawania StaffType -->
+    <div class="modal" id="addStaffTypeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nowy Typ Członka Ekipy</h2>
+                <button class="modal-close" onclick="closeAddStaffTypeModal()">&times;</button>
+            </div>
+            <form id="addStaffTypeForm">
+                <div class="form-group">
+                    <label for="staffTypeName">Nazwa Typu *</label>
+                    <input type="text" class="form-control" id="staffTypeName" required placeholder="np. Redaktor prowadzący, Operator kamery">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeAddStaffTypeModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Dodaj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal dodawania Guest -->
+    <div class="modal" id="addGuestModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nowy Gość</h2>
+                <button class="modal-close" onclick="closeAddGuestModal()">&times;</button>
+            </div>
+            <form id="addGuestForm">
+                <div class="form-group">
+                    <label for="guestType">Typ</label>
+                    <select class="form-control" id="guestType">
+                        <option value="">Wybierz typ...</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="episodeNumber">Numer Odcinka (ciągły) *</label>
-                    <input type="number" class="form-control" id="episodeNumber" required min="1">
+                    <label for="guestFirstName">Imię *</label>
+                    <input type="text" class="form-control" id="guestFirstName" required>
                 </div>
                 <div class="form-group">
-                    <label for="seasonEpisode">Numer w Sezonie *</label>
-                    <input type="number" class="form-control" id="seasonEpisode" required min="1">
-                </div>
-                <div class="form-group">
-                    <label for="episodeTitle">Tytuł *</label>
-                    <input type="text" class="form-control" id="episodeTitle" required>
-                </div>
-                <div class="form-group">
-                    <label for="episodeDate">Data Odcinka</label>
-                    <input type="date" class="form-control" id="episodeDate">
-                </div>
-                <div class="form-group">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="episodeIsCurrent">
-                        <label for="episodeIsCurrent">Ustaw jako aktualny odcinek</label>
-                    </div>
+                    <label for="guestLastName">Nazwisko *</label>
+                    <input type="text" class="form-control" id="guestLastName" required>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn" onclick="closeModal()">Anuluj</button>
+                    <button type="button" class="btn" onclick="closeAddGuestModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Dodaj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal dodawania GuestType -->
+    <div class="modal" id="addGuestTypeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nowy Typ Gościa</h2>
+                <button class="modal-close" onclick="closeAddGuestTypeModal()">&times;</button>
+            </div>
+            <form id="addGuestTypeForm">
+                <div class="form-group">
+                    <label for="guestTypeName">Nazwa Typu *</label>
+                    <input type="text" class="form-control" id="guestTypeName" required placeholder="np. Ekspert, Artysta, Polityk">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeAddGuestTypeModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Dodaj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal przypisywania Media -->
+    <div class="modal" id="assignMediaModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Przypisz Media</h2>
+                <button class="modal-close" onclick="closeAssignMediaModal()">&times;</button>
+            </div>
+            <form id="assignMediaForm">
+                <input type="hidden" id="mediaFilePath">
+                <input type="hidden" id="mediaFileDuration">
+                <div class="form-group">
+                    <label>Plik</label>
+                    <div style="padding: 8px; background: #1a1a1a; border-radius: 4px; font-size: 12px;" id="mediaFileName"></div>
+                </div>
+                <div class="form-group">
+                    <label for="mediaTitle">Tytuł *</label>
+                    <input type="text" class="form-control" id="mediaTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="mediaDescription">Opis</label>
+                    <textarea class="form-control" id="mediaDescription" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="mediaSource">Scena (Typ) *</label>
+                    <select class="form-control" id="mediaSource" required>
+                        <option value="">Wybierz...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="mediaStaff">Autor</label>
+                    <select class="form-control" id="mediaStaff">
+                        <option value="">Brak</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeAssignMediaModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Przypisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal edycji typów Staff -->
+    <div class="modal" id="editStaffTypesModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edytuj Typy Członka Ekipy</h2>
+                <button class="modal-close" onclick="closeEditStaffTypesModal()">&times;</button>
+            </div>
+            <form id="editStaffTypesForm">
+                <input type="hidden" id="editStaffAssignmentId">
+                <div class="form-group">
+                    <label>Członek ekipy</label>
+                    <div style="padding: 8px; background: #1a1a1a; border-radius: 4px; font-size: 12px;" id="editStaffName"></div>
+                </div>
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label for="editStaffTypesSelect">Typy (można wybrać wiele z Ctrl/Cmd)</label>
+                        <button type="button" class="btn btn-secondary btn-small" onclick="openAddStaffTypeModalFromEdit()">+ Nowy Typ</button>
+                    </div>
+                    <select class="form-control" id="editStaffTypesSelect" multiple style="height: 150px;">
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeEditStaffTypesModal()">Anuluj</button>
                     <button type="submit" class="btn btn-primary">Zapisz</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <script>
-        let episodes = [];
-        let seasons = [];
+    <!-- Modal edycji Gościa w odcinku -->
+    <div class="modal" id="editGuestModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edytuj Gościa</h2>
+                <button class="modal-close" onclick="closeEditGuestModal()">&times;</button>
+            </div>
+            <form id="editGuestForm">
+                <input type="hidden" id="editGuestAssignmentId">
+                <div class="form-group">
+                    <label>Gość</label>
+                    <div style="padding: 8px; background: #1a1a1a; border-radius: 4px; font-size: 12px;" id="editGuestName"></div>
+                </div>
+                <div class="form-group">
+                    <label for="editGuestTopic">Temat</label>
+                    <input type="text" class="form-control" id="editGuestTopic">
+                </div>
+                <div class="form-group">
+                    <label for="editGuestOrder">Kolejność</label>
+                    <input type="number" class="form-control" id="editGuestOrder" value="1" min="1">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeEditGuestModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        // Ładowanie sezonów
-        async function loadSeasons() {
-            try {
-                const response = await fetch('/api/seasons');
-                seasons = await response.json();
-                updateSeasonSelects();
-            } catch (error) {
-                console.error('Błąd ładowania sezonów:', error);
-            }
-        }
+    <!-- Modal dodawania MediaGroup -->
+    <div class="modal" id="addMediaGroupModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nowa Grupa Mediów</h2>
+                <button class="modal-close" onclick="closeAddMediaGroupModal()">&times;</button>
+            </div>
+            <form id="addMediaGroupForm">
+                <div class="form-group">
+                    <label for="mediaGroupName">Nazwa Grupy *</label>
+                    <input type="text" class="form-control" id="mediaGroupName" required placeholder="np. Blok reportaży tygodnia, Playlista muzyczna">
+                </div>
+                <div class="form-group">
+                    <label for="mediaGroupDescription">Opis</label>
+                    <textarea class="form-control" id="mediaGroupDescription" rows="2" placeholder="Opcjonalny opis grupy"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeAddMediaGroupModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Utwórz</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        function updateSeasonSelects() {
-            // Filtr
-            const filterSelect = document.getElementById('seasonFilter');
-            filterSelect.innerHTML = '<option value="">Wszystkie</option>' +
-                seasons.map(s => `<option value="${s.id}">Sezon ${s.number}</option>`).join('');
-
-            // Modal
-            const modalSelect = document.getElementById('episodeSeason');
-            modalSelect.innerHTML = '<option value="">Wybierz sezon...</option>' +
-                seasons.map(s => `<option value="${s.id}">Sezon ${s.number}${s.is_current ? ' (aktualny)' : ''}</option>`).join('');
-        }
-
-        // Ładowanie odcinków
-        async function loadEpisodes() {
-            try {
-                const seasonId = document.getElementById('seasonFilter').value;
-                const url = seasonId ? `/api/episodes?season_id=${seasonId}` : '/api/episodes';
-                const response = await fetch(url);
-                episodes = await response.json();
-                renderEpisodes();
-            } catch (error) {
-                console.error('Błąd ładowania odcinków:', error);
-            }
-        }
-
-        // Renderowanie tabeli
-        function renderEpisodes() {
-            const tbody = document.getElementById('episodesTableBody');
-            
-            if (episodes.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6">
-                            <div class="empty-state">
-                                <div class="empty-state-icon">📺</div>
-                                <div>Brak odcinków. Utwórz pierwszy odcinek.</div>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            tbody.innerHTML = episodes.map(episode => {
-                const date = episode.episode_date ? new Date(episode.episode_date).toLocaleDateString('pl-PL') : '-';
-                const season = episode.season ? episode.season.number : '-';
+    <!-- Modal zarządzania MediaGroup -->
+    <div class="modal" id="manageMediaGroupModal">
+        <div class="modal-content modal-content-large">
+            <div class="modal-header">
+                <h2 id="manageMediaGroupTitle">Zarządzanie Grupą</h2>
+                <button class="modal-close" onclick="closeManageMediaGroupModal()">&times;</button>
+            </div>
+            <div style="padding: 20px;">
+                <input type="hidden" id="currentMediaGroupId">
                 
-                return `
-                    <tr>
-                        <td><strong>${episode.episode_number}</strong></td>
-                        <td>S${season}E${episode.season_episode}</td>
-                        <td>${episode.title}</td>
-                        <td>${date}</td>
-                        <td>
-                            ${episode.is_current ? '<span class="badge badge-success">Aktualny</span>' : '<span class="badge badge-secondary">-</span>'}
-                        </td>
-                        <td>
-                            <div class="table-actions">
-                                ${!episode.is_current ? `<button class="btn btn-success btn-small" onclick="setCurrentEpisode(${episode.id})">Aktywuj</button>` : ''}
-                                <button class="btn btn-primary btn-small" onclick="openEditModal(${episode.id})">Edytuj</button>
-                                <button class="btn btn-danger btn-small" onclick="deleteEpisode(${episode.id})">Usuń</button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-        }
+                <div class="form-group">
+                    <label>Opis grupy:</label>
+                    <div style="padding: 8px; background: #1a1a1a; border-radius: 4px; font-size: 12px;" id="mediaGroupInfo"></div>
+                </div>
 
-        // Otwórz modal tworzenia
-        function openCreateModal() {
-            document.getElementById('modalTitle').textContent = 'Nowy Odcinek';
-            document.getElementById('episodeForm').reset();
-            document.getElementById('episodeId').value = '';
-            document.getElementById('episodeModal').classList.add('active');
-        }
+                <div style="margin-top: 20px;">
+                    <h4 style="margin-bottom: 10px;">Dostępne media przypisane do odcinka:</h4>
+                    <div id="availableMediaForGroup" style="max-height: 200px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; padding: 10px;">
+                        <div style="text-align: center; color: #666;">Brak dostępnych mediów</div>
+                    </div>
+                </div>
 
-        // Otwórz modal edycji
-        function openEditModal(id) {
-            const episode = episodes.find(e => e.id === id);
-            if (!episode) return;
+                <div style="margin-top: 20px;">
+                    <h4 style="margin-bottom: 10px;">Media w grupie:</h4>
+                    <div id="groupMediaList" style="max-height: 300px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; padding: 10px;">
+                        <div style="text-align: center; color: #666;">Brak mediów w grupie</div>
+                    </div>
+                </div>
 
-            document.getElementById('modalTitle').textContent = 'Edycja Odcinka';
-            document.getElementById('episodeId').value = episode.id;
-            document.getElementById('episodeSeason').value = episode.season_id;
-            document.getElementById('episodeNumber').value = episode.episode_number;
-            document.getElementById('seasonEpisode').value = episode.season_episode;
-            document.getElementById('episodeTitle').value = episode.title;
-            
-            if (episode.episode_date) {
-                const date = new Date(episode.episode_date);
-                document.getElementById('episodeDate').value = date.toISOString().split('T')[0];
-            }
-            
-            document.getElementById('episodeIsCurrent').checked = episode.is_current;
-            document.getElementById('episodeModal').classList.add('active');
-        }
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" onclick="deleteMediaGroup()">Usuń Grupę</button>
+                    <button type="button" class="btn" onclick="closeManageMediaGroupModal()">Zamknij</button>
+                    <button type="button" class="btn btn-success" onclick="setMediaGroupAsCurrent()">Ustaw jako Aktywną</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        // Zamknij modal
-        function closeModal() {
-            document.getElementById('episodeModal').classList.remove('active');
-        }
-
-        // Zapisz odcinek
-        document.getElementById('episodeForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const id = document.getElementById('episodeId').value;
-            const dateValue = document.getElementById('episodeDate').value;
-            
-            const data = {
-                season_id: parseInt(document.getElementById('episodeSeason').value),
-                episode_number: parseInt(document.getElementById('episodeNumber').value),
-                season_episode: parseInt(document.getElementById('seasonEpisode').value),
-                title: document.getElementById('episodeTitle').value,
-                episode_date: dateValue ? new Date(dateValue).toISOString() : new Date().toISOString(),
-                is_current: document.getElementById('episodeIsCurrent').checked
-            };
-
-            try {
-                const url = id ? `/api/episodes/${id}` : '/api/episodes';
-                const method = id ? 'PUT' : 'POST';
-                
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
-                    closeModal();
-                    loadEpisodes();
-                } else {
-                    const error = await response.text();
-                    alert('Błąd zapisu odcinka: ' + error);
-                }
-            } catch (error) {
-                console.error('Błąd:', error);
-                alert('Błąd połączenia');
-            }
-        });
-
-        // Ustaw aktualny odcinek
-        async function setCurrentEpisode(id) {
-            if (!confirm('Czy na pewno chcesz ustawić ten odcinek jako aktualny?')) return;
-
-            try {
-                const response = await fetch(`/api/episodes/${id}/set-current`, {
-                    method: 'POST'
-                });
-
-                if (response.ok) {
-                    loadEpisodes();
-                } else {
-                    alert('Błąd ustawiania odcinka');
-                }
-            } catch (error) {
-                console.error('Błąd:', error);
-                alert('Błąd połączenia');
-            }
-        }
-
-        // Usuń odcinek
-        async function deleteEpisode(id) {
-            if (!confirm('Czy na pewno chcesz usunąć ten odcinek? Ta operacja jest nieodwracalna.')) return;
-
-            try {
-                const response = await fetch(`/api/episodes/${id}`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    loadEpisodes();
-                } else {
-                    const error = await response.text();
-                    alert('Błąd usuwania odcinka: ' + error);
-                }
-            } catch (error) {
-                console.error('Błąd:', error);
-                alert('Błąd połączenia');
-            }
-        }
-
-        // Inicjalizacja
-        loadSeasons();
-        loadEpisodes();
-    </script>
+    <script src="/static/js/episodes-manager.js"></script>
 </body>
 </html>

@@ -37,32 +37,41 @@ type Episode struct {
 
 // StaffType reprezentuje typ członka ekipy
 type StaffType struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	Name      string    `gorm:"size:100;uniqueIndex;not null" json:"name"` // np. "Redaktor prowadzący", "Realizator dźwięku"
-	Staff     []Staff   `gorm:"foreignKey:StaffTypeID" json:"staff"`
+	ID   uint   `gorm:"primaryKey" json:"id"`
+	Name string `gorm:"size:100;uniqueIndex;not null" json:"name"` // np. "Redaktor prowadzący", "Realizator dźwięku"
+	// Staff     []Staff   `gorm:"foreignKey:StaffTypeID" json:"staff"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Staff reprezentuje członka ekipy
 type Staff struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	StaffTypeID uint      `gorm:"index;not null" json:"staff_type_id"`
-	StaffType   StaffType `gorm:"foreignKey:StaffTypeID" json:"staff_type"`
-	FirstName   string    `gorm:"size:100;not null" json:"first_name"`
-	LastName    string    `gorm:"size:100;not null" json:"last_name"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	FirstName string    `gorm:"size:100;not null" json:"first_name"`
+	LastName  string    `gorm:"size:100;not null" json:"last_name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // EpisodeStaff reprezentuje przypisanie członka ekipy do odcinka
 type EpisodeStaff struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	EpisodeID uint      `gorm:"index;not null" json:"episode_id"`
-	Episode   Episode   `gorm:"foreignKey:EpisodeID" json:"episode"`
-	StaffID   uint      `gorm:"index;not null" json:"staff_id"`
-	Staff     Staff     `gorm:"foreignKey:StaffID" json:"staff"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         uint               `gorm:"primaryKey" json:"id"`
+	EpisodeID  uint               `gorm:"index;not null" json:"episode_id"`
+	Episode    Episode            `gorm:"foreignKey:EpisodeID" json:"episode"`
+	StaffID    uint               `gorm:"index;not null" json:"staff_id"`
+	Staff      Staff              `gorm:"foreignKey:StaffID" json:"staff"`
+	StaffTypes []EpisodeStaffType `gorm:"foreignKey:EpisodeStaffID" json:"staff_types"` // Wiele typów dla tego przypisania
+	CreatedAt  time.Time          `json:"created_at"`
+}
+
+// EpisodeStaffType reprezentuje przypisanie typu do członka ekipy w kontekście odcinka
+type EpisodeStaffType struct {
+	ID             uint         `gorm:"primaryKey" json:"id"`
+	EpisodeStaffID uint         `gorm:"index;not null" json:"episode_staff_id"`
+	EpisodeStaff   EpisodeStaff `gorm:"foreignKey:EpisodeStaffID" json:"episode_staff"`
+	StaffTypeID    uint         `gorm:"index;not null" json:"staff_type_id"`
+	StaffType      StaffType    `gorm:"foreignKey:StaffTypeID" json:"staff_type"`
+	CreatedAt      time.Time    `json:"created_at"`
 }
 
 // GuestType reprezentuje typ gościa
@@ -97,6 +106,28 @@ type EpisodeGuest struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+// MediaGroup reprezentuje grupę mediów (np. "Blok reportaży", "Playlista muzyczna")
+type MediaGroup struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	Name        string    `gorm:"size:200;not null" json:"name"`
+	Description string    `gorm:"type:text" json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// EpisodeMediaGroup reprezentuje przypisanie media do grupy w kontekście odcinka
+// Pozwala na tworzenie playlist i grup reportaży
+type EpisodeMediaGroup struct {
+	ID             uint         `gorm:"primaryKey" json:"id"`
+	EpisodeMediaID uint         `gorm:"index;not null" json:"episode_media_id"`
+	EpisodeMedia   EpisodeMedia `gorm:"foreignKey:EpisodeMediaID" json:"episode_media"`
+	MediaGroupID   uint         `gorm:"index;not null" json:"media_group_id"`
+	MediaGroup     MediaGroup   `gorm:"foreignKey:MediaGroupID" json:"media_group"`
+	IsCurrent      bool         `gorm:"default:false" json:"is_current"` // Czy grupa jest aktywna w źródle List
+	EpisodeOrder   int          `gorm:"default:0" json:"episode_order"`  // Kolejność w grupie
+	CreatedAt      time.Time    `json:"created_at"`
+}
+
 // Scene reprezentuje scenę OBS
 type Scene struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
@@ -122,23 +153,24 @@ type Source struct {
 }
 
 // EpisodeMedia reprezentuje media (reportaże, filmy) przypisane do odcinka
-// Rodzaj media (reportaż vs zwykłe media) określony przez SceneID
+// Scena określa typ media: MEDIA lub REPORTAZE
 type EpisodeMedia struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	EpisodeID   uint      `gorm:"index;not null" json:"episode_id"`
-	Episode     Episode   `gorm:"foreignKey:EpisodeID" json:"episode"`
-	SourceID    uint      `gorm:"index" json:"source_id"` // Powiązanie ze źródłem w OBS
-	Source      Source    `gorm:"foreignKey:SourceID" json:"source"`
-	StaffID     *uint     `gorm:"index" json:"staff_id"`           // Autor media (nullable)
-	Staff       *Staff    `gorm:"foreignKey:StaffID" json:"staff"` // Autor media (nullable)
-	Title       string    `gorm:"size:300;not null" json:"title"`
-	Description string    `gorm:"type:text" json:"description"`
-	FilePath    *string   `gorm:"size:1000" json:"file_path"` // Ścieżka do pliku (nullable)
-	URL         *string   `gorm:"size:1000" json:"url"`       // URL jeśli zewnętrzne (nullable)
-	Duration    int       `json:"duration"`                   // Czas trwania w sekundach
-	Order       int       `json:"order"`                      // Kolejność w odcinku
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID             uint                `gorm:"primaryKey" json:"id"`
+	EpisodeID      uint                `gorm:"index;not null" json:"episode_id"`
+	Episode        Episode             `gorm:"foreignKey:EpisodeID" json:"episode"`
+	SceneID        uint                `gorm:"index;not null" json:"scene_id"` // MEDIA lub REPORTAZE
+	Scene          Scene               `gorm:"foreignKey:SceneID" json:"scene"`
+	EpisodeStaffID *uint               `gorm:"index" json:"episode_staff_id"`                  // Autor z przypisanej ekipy (nullable)
+	EpisodeStaff   *EpisodeStaff       `gorm:"foreignKey:EpisodeStaffID" json:"episode_staff"` // Autor z przypisanej ekipy (nullable)
+	Title          string              `gorm:"size:300;not null" json:"title"`
+	Description    string              `gorm:"type:text" json:"description"`
+	FilePath       *string             `gorm:"size:1000" json:"file_path"`                    // Ścieżka do pliku (nullable)
+	URL            *string             `gorm:"size:1000" json:"url"`                          // URL jeśli zewnętrzne (nullable)
+	Duration       int                 `json:"duration"`                                      // Czas trwania w sekundach
+	IsCurrent      bool                `gorm:"default:false" json:"is_current"`               // Czy wczytany w źródło Single
+	MediaGroups    []EpisodeMediaGroup `gorm:"foreignKey:EpisodeMediaID" json:"media_groups"` // Przynależność do grup
+	CreatedAt      time.Time           `json:"created_at"`
+	UpdatedAt      time.Time           `json:"updated_at"`
 }
 
 // InitDB inicjalizuje bazę danych
@@ -149,12 +181,15 @@ func InitDB(db *gorm.DB) error {
 		&StaffType{},
 		&Staff{},
 		&EpisodeStaff{},
+		&EpisodeStaffType{},
 		&GuestType{},
 		&Guest{},
 		&EpisodeGuest{},
+		&MediaGroup{},
 		&Scene{},
 		&Source{},
 		&EpisodeMedia{},
+		&EpisodeMediaGroup{},
 	)
 }
 
@@ -253,6 +288,79 @@ func CreateEpisodeAsCurrent(db *gorm.DB, episode *Episode) error {
 		// Utwórz nowy odcinek jako aktualny
 		episode.IsCurrent = true
 		if err := tx.Create(episode).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+// GetMediaScenes zwraca sceny MEDIA i REPORTAZE
+func GetMediaScenes(db *gorm.DB) ([]Scene, error) {
+	var scenes []Scene
+	result := db.Where("name IN ?", []string{"MEDIA", "REPORTAZE"}).
+		Preload("Sources").
+		Find(&scenes)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return scenes, nil
+}
+
+// GetMediaSceneByName zwraca scenę po nazwie (MEDIA lub REPORTAZE)
+func GetMediaSceneByName(db *gorm.DB, name string) (*Scene, error) {
+	var scene Scene
+	result := db.Where("name = ?", name).
+		Preload("Sources").
+		First(&scene)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &scene, nil
+}
+
+// SetCurrentEpisodeMedia ustawia media jako current (wczytane w źródło Single)
+func SetCurrentEpisodeMedia(db *gorm.DB, episodeID uint, mediaID uint) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Pobierz media aby znać scenę
+		var media EpisodeMedia
+		if err := tx.First(&media, mediaID).Error; err != nil {
+			return err
+		}
+
+		// Wyłącz wszystkie media tej samej sceny w tym odcinku
+		if err := tx.Model(&EpisodeMedia{}).
+			Where("episode_id = ? AND scene_id = ? AND is_current = ?", episodeID, media.SceneID, true).
+			Update("is_current", false).Error; err != nil {
+			return err
+		}
+
+		// Włącz wybrane media
+		if err := tx.Model(&media).Update("is_current", true).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+// SetCurrentMediaGroup ustawia grupę jako current (wczytana w źródło List)
+func SetCurrentMediaGroup(db *gorm.DB, episodeID uint, groupID uint) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Wyłącz wszystkie grupy w tym odcinku
+		if err := tx.Model(&EpisodeMediaGroup{}).
+			Joins("JOIN episode_media ON episode_media_groups.episode_media_id = episode_media.id").
+			Where("episode_media.episode_id = ? AND is_current = ?", episodeID, true).
+			Update("is_current", false).Error; err != nil {
+			return err
+		}
+
+		// Włącz wybraną grupę
+		if err := tx.Model(&EpisodeMediaGroup{}).
+			Where("media_group_id = ?", groupID).
+			Update("is_current", true).Error; err != nil {
 			return err
 		}
 

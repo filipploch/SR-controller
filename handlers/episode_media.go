@@ -37,10 +37,12 @@ func (h *EpisodeMediaHandler) GetEpisodeMedia(w http.ResponseWriter, r *http.Req
 	}
 
 	var media []models.EpisodeMedia
-	result := h.DB.Preload("Source.Scene").
-		Preload("Staff.StaffType").
+	result := h.DB.Preload("Scene").
+		Preload("EpisodeStaff.Staff").
+		Preload("EpisodeStaff.StaffTypes.StaffType").
+		Preload("MediaGroups.MediaGroup").
 		Where("episode_id = ?", episodeID).
-		Order("order ASC").
+		Order("created_at ASC").
 		Find(&media)
 
 	if result.Error != nil {
@@ -83,7 +85,10 @@ func (h *EpisodeMediaHandler) CreateEpisodeMedia(w http.ResponseWriter, r *http.
 	}
 
 	// Załaduj relacje
-	h.DB.Preload("Source.Scene").Preload("Staff.StaffType").First(&media, media.ID)
+	h.DB.Preload("Scene").
+		Preload("EpisodeStaff.Staff").
+		Preload("EpisodeStaff.StaffTypes.StaffType").
+		First(&media, media.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -121,13 +126,12 @@ func (h *EpisodeMediaHandler) UpdateEpisodeMedia(w http.ResponseWriter, r *http.
 		return
 	}
 
-	media.SourceID = updateData.SourceID
-	media.StaffID = updateData.StaffID
+	media.SceneID = updateData.SceneID
+	media.EpisodeStaffID = updateData.EpisodeStaffID
 	media.Title = updateData.Title
 	media.Description = updateData.Description
 	media.FilePath = updateData.FilePath
 	media.URL = updateData.URL
-	media.Order = updateData.Order
 
 	// Jeśli zmieniono FilePath, odczytaj nowy duration
 	if media.FilePath != nil && *media.FilePath != "" {
@@ -142,7 +146,10 @@ func (h *EpisodeMediaHandler) UpdateEpisodeMedia(w http.ResponseWriter, r *http.
 		return
 	}
 
-	h.DB.Preload("Source.Scene").Preload("Staff.StaffType").First(&media, media.ID)
+	h.DB.Preload("Scene").
+		Preload("EpisodeStaff.Staff").
+		Preload("EpisodeStaff.StaffTypes.StaffType").
+		First(&media, media.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(media)
@@ -210,15 +217,9 @@ func (h *EpisodeMediaHandler) UploadMedia(w http.ResponseWriter, r *http.Request
 	}
 	defer file.Close()
 
-	mediaType := r.FormValue("media_type") // "reportages", "videos", "images"
-	if mediaType == "" {
-		mediaType = "videos"
-	}
-
-	// Utwórz folder docelowy: media/{mediaType}/S{season}/E{episode}/
-	seasonFolder := fmt.Sprintf("S%02d", episode.Season.Number)
-	episodeFolder := fmt.Sprintf("E%03d", episode.SeasonEpisode)
-	targetDir := filepath.Join(h.MediaPath, mediaType, seasonFolder, episodeFolder)
+	// Utwórz folder docelowy: media/season_{number}/
+	seasonFolder := fmt.Sprintf("season_%d", episode.Season.Number)
+	targetDir := filepath.Join(h.MediaPath, seasonFolder)
 
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		http.Error(w, "Error creating directory", http.StatusInternalServerError)
@@ -243,7 +244,7 @@ func (h *EpisodeMediaHandler) UploadMedia(w http.ResponseWriter, r *http.Request
 	duration, _ := utils.GetMediaDuration(targetPath)
 
 	// Względna ścieżka od folderu media
-	relativePath := filepath.Join(mediaType, seasonFolder, episodeFolder, handler.Filename)
+	relativePath := filepath.Join(seasonFolder, handler.Filename)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -269,38 +270,73 @@ func (h *EpisodeMediaHandler) ListMediaFiles(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	seasonFolder := fmt.Sprintf("S%02d", episode.Season.Number)
-	episodeFolder := fmt.Sprintf("E%03d", episode.SeasonEpisode)
+	seasonFolder := fmt.Sprintf("season_%d", episode.Season.Number)
+	dirPath := filepath.Join(h.MediaPath, seasonFolder)
 
-	// Skanuj wszystkie typy mediów
-	mediaTypes := []string{"reportages", "videos", "images", "audio"}
 	var files []map[string]interface{}
 
-	for _, mediaType := range mediaTypes {
-		dirPath := filepath.Join(h.MediaPath, mediaType, seasonFolder, episodeFolder)
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		// Folder nie istnieje, zwracamy pustą listę
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(files)
+		return
+	}
 
-		entries, err := os.ReadDir(dirPath)
-		if err != nil {
-			continue // Folder nie istnieje, pomijamy
-		}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			relativePath := filepath.Join(seasonFolder, entry.Name())
+			fullPath := filepath.Join(h.MediaPath, relativePath)
 
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				relativePath := filepath.Join(mediaType, seasonFolder, episodeFolder, entry.Name())
-				fullPath := filepath.Join(h.MediaPath, relativePath)
+			duration, _ := utils.GetMediaDuration(fullPath)
 
-				duration, _ := utils.GetMediaDuration(fullPath)
-
-				files = append(files, map[string]interface{}{
-					"name":     entry.Name(),
-					"path":     relativePath,
-					"type":     mediaType,
-					"duration": duration,
-				})
+			// Określ typ pliku na podstawie rozszerzenia
+			ext := filepath.Ext(entry.Name())
+			var fileType string
+			switch ext {
+			case ".mp4", ".avi", ".mov", ".mkv", ".webm":
+				fileType = "video"
+			case ".mp3", ".wav", ".flac", ".aac":
+				fileType = "audio"
+			case ".jpg", ".jpeg", ".png", ".gif", ".webp":
+				fileType = "image"
+			default:
+				fileType = "other"
 			}
+
+			files = append(files, map[string]interface{}{
+				"name":     entry.Name(),
+				"path":     relativePath,
+				"type":     fileType,
+				"duration": duration,
+			})
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(files)
+}
+
+// SetCurrentMedia - POST /api/episodes/{episode_id}/media/{id}/set-current
+func (h *EpisodeMediaHandler) SetCurrentMedia(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	mediaID, err := strconv.ParseUint(vars["id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid media ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := models.SetCurrentEpisodeMedia(h.DB, uint(episodeID), uint(mediaID)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }

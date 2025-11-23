@@ -61,6 +61,8 @@ func main() {
 	guestTypeHandler := handlers.NewGuestTypeHandler(db)
 	guestHandler := handlers.NewGuestHandler(db)
 	episodeGuestHandler := handlers.NewEpisodeGuestHandler(db)
+	sceneHandler := handlers.NewSceneHandler(db)
+	mediaGroupHandler := handlers.NewMediaGroupHandler(db)
 
 	// Ścieżka do mediów
 	mediaPath := "./media"
@@ -150,6 +152,7 @@ func main() {
 	api.HandleFunc("/episodes/{episode_id}/staff", episodeStaffHandler.GetEpisodeStaff).Methods("GET")
 	api.HandleFunc("/episodes/{episode_id}/staff", episodeStaffHandler.AddStaffToEpisode).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/staff/{id}", episodeStaffHandler.RemoveStaffFromEpisode).Methods("DELETE")
+	api.HandleFunc("/episodes/{episode_id}/staff/{id}/types", episodeStaffHandler.UpdateEpisodeStaffTypes).Methods("PUT")
 
 	// API REST dla Guests
 	api.HandleFunc("/guest-types", guestTypeHandler.GetGuestTypes).Methods("GET")
@@ -174,8 +177,24 @@ func main() {
 	api.HandleFunc("/episodes/{episode_id}/media", episodeMediaHandler.CreateEpisodeMedia).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/media/{id}", episodeMediaHandler.UpdateEpisodeMedia).Methods("PUT")
 	api.HandleFunc("/episodes/{episode_id}/media/{id}", episodeMediaHandler.DeleteEpisodeMedia).Methods("DELETE")
+	api.HandleFunc("/episodes/{episode_id}/media/{id}/set-current", episodeMediaHandler.SetCurrentMedia).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/media/upload", episodeMediaHandler.UploadMedia).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/media/files", episodeMediaHandler.ListMediaFiles).Methods("GET")
+
+	// API REST dla Scenes
+	api.HandleFunc("/scenes", sceneHandler.GetScenes).Methods("GET")
+	api.HandleFunc("/scenes/media", sceneHandler.GetMediaScenes).Methods("GET")
+
+	// API REST dla MediaGroup
+	api.HandleFunc("/media-groups", mediaGroupHandler.GetMediaGroups).Methods("GET")
+	api.HandleFunc("/media-groups", mediaGroupHandler.CreateMediaGroup).Methods("POST")
+	api.HandleFunc("/media-groups/{id}", mediaGroupHandler.GetMediaGroup).Methods("GET")
+	api.HandleFunc("/media-groups/{id}", mediaGroupHandler.UpdateMediaGroup).Methods("PUT")
+	api.HandleFunc("/media-groups/{id}", mediaGroupHandler.DeleteMediaGroup).Methods("DELETE")
+	api.HandleFunc("/media-groups/{id}/items", mediaGroupHandler.GetMediaGroupItems).Methods("GET")
+	api.HandleFunc("/media-groups/{group_id}/media/{media_id}", mediaGroupHandler.AddMediaToGroup).Methods("POST")
+	api.HandleFunc("/media-groups/{group_id}/media/{media_id}", mediaGroupHandler.RemoveMediaFromGroup).Methods("DELETE")
+	api.HandleFunc("/episodes/{episode_id}/media-groups/{group_id}/set-current", mediaGroupHandler.SetCurrentMediaGroup).Methods("POST")
 
 	log.Println("========================================")
 	log.Println("Serwer działa: http://localhost:8080")

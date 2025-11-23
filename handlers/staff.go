@@ -21,15 +21,7 @@ func NewStaffHandler(db *gorm.DB) *StaffHandler {
 // GetStaff - GET /api/staff
 func (h *StaffHandler) GetStaff(w http.ResponseWriter, r *http.Request) {
 	var staff []models.Staff
-
-	query := h.DB.Preload("StaffType")
-
-	// Filtruj po typie jeśli podano
-	if typeID := r.URL.Query().Get("type_id"); typeID != "" {
-		query = query.Where("staff_type_id = ?", typeID)
-	}
-
-	result := query.Order("last_name ASC, first_name ASC").Find(&staff)
+	result := h.DB.Order("last_name ASC, first_name ASC").Find(&staff)
 
 	if result.Error != nil {
 		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
@@ -50,7 +42,7 @@ func (h *StaffHandler) GetStaffMember(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var staff models.Staff
-	result := h.DB.Preload("StaffType").First(&staff, id)
+	result := h.DB.First(&staff, id)
 
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
@@ -73,20 +65,10 @@ func (h *StaffHandler) CreateStaff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Sprawdź czy typ istnieje
-	var staffType models.StaffType
-	if err := h.DB.First(&staffType, staff.StaffTypeID).Error; err != nil {
-		http.Error(w, "StaffType not found", http.StatusBadRequest)
-		return
-	}
-
 	if err := h.DB.Create(&staff).Error; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// Załaduj relacje
-	h.DB.Preload("StaffType").First(&staff, staff.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -118,14 +100,6 @@ func (h *StaffHandler) UpdateStaff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Sprawdź czy typ istnieje
-	var staffType models.StaffType
-	if err := h.DB.First(&staffType, updateData.StaffTypeID).Error; err != nil {
-		http.Error(w, "StaffType not found", http.StatusBadRequest)
-		return
-	}
-
-	staff.StaffTypeID = updateData.StaffTypeID
 	staff.FirstName = updateData.FirstName
 	staff.LastName = updateData.LastName
 
@@ -133,9 +107,6 @@ func (h *StaffHandler) UpdateStaff(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// Załaduj relacje
-	h.DB.Preload("StaffType").First(&staff, staff.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(staff)

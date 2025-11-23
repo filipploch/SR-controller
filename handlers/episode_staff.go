@@ -28,7 +28,8 @@ func (h *EpisodeStaffHandler) GetEpisodeStaff(w http.ResponseWriter, r *http.Req
 	}
 
 	var episodeStaff []models.EpisodeStaff
-	result := h.DB.Preload("Staff.StaffType").
+	result := h.DB.Preload("Staff").
+		Preload("StaffTypes.StaffType").
 		Where("episode_id = ?", episodeID).
 		Find(&episodeStaff)
 
@@ -51,7 +52,8 @@ func (h *EpisodeStaffHandler) AddStaffToEpisode(w http.ResponseWriter, r *http.R
 	}
 
 	var data struct {
-		StaffID uint `json:"staff_id"`
+		StaffID      uint   `json:"staff_id"`
+		StaffTypeIDs []uint `json:"staff_type_ids"` // Lista typów dla tego przypisania
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
@@ -80,6 +82,7 @@ func (h *EpisodeStaffHandler) AddStaffToEpisode(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// Utwórz przypisanie
 	episodeStaff := models.EpisodeStaff{
 		EpisodeID: uint(episodeID),
 		StaffID:   data.StaffID,
@@ -90,8 +93,25 @@ func (h *EpisodeStaffHandler) AddStaffToEpisode(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// Dodaj typy jeśli podano
+	if len(data.StaffTypeIDs) > 0 {
+		for _, typeID := range data.StaffTypeIDs {
+			// Sprawdź czy typ istnieje
+			var staffType models.StaffType
+			if err := h.DB.First(&staffType, typeID).Error; err != nil {
+				continue // Pomijamy nieistniejące typy
+			}
+
+			episodeStaffType := models.EpisodeStaffType{
+				EpisodeStaffID: episodeStaff.ID,
+				StaffTypeID:    typeID,
+			}
+			h.DB.Create(&episodeStaffType)
+		}
+	}
+
 	// Załaduj relacje
-	h.DB.Preload("Staff.StaffType").First(&episodeStaff, episodeStaff.ID)
+	h.DB.Preload("Staff").Preload("StaffTypes.StaffType").First(&episodeStaff, episodeStaff.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -129,4 +149,63 @@ func (h *EpisodeStaffHandler) RemoveStaffFromEpisode(w http.ResponseWriter, r *h
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// UpdateEpisodeStaffTypes - PUT /api/episodes/{episode_id}/staff/{id}/types
+func (h *EpisodeStaffHandler) UpdateEpisodeStaffTypes(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.ParseUint(vars["id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	var episodeStaff models.EpisodeStaff
+	if err := h.DB.Where("id = ? AND episode_id = ?", id, episodeID).First(&episodeStaff).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			http.Error(w, "Assignment not found", http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	var data struct {
+		StaffTypeIDs []uint `json:"staff_type_ids"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Usuń stare typy
+	h.DB.Where("episode_staff_id = ?", id).Delete(&models.EpisodeStaffType{})
+
+	// Dodaj nowe typy
+	for _, typeID := range data.StaffTypeIDs {
+		// Sprawdź czy typ istnieje
+		var staffType models.StaffType
+		if err := h.DB.First(&staffType, typeID).Error; err != nil {
+			continue // Pomijamy nieistniejące typy
+		}
+
+		episodeStaffType := models.EpisodeStaffType{
+			EpisodeStaffID: episodeStaff.ID,
+			StaffTypeID:    typeID,
+		}
+		h.DB.Create(&episodeStaffType)
+	}
+
+	// Załaduj relacje
+	h.DB.Preload("Staff").Preload("StaffTypes.StaffType").First(&episodeStaff, episodeStaff.ID)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(episodeStaff)
 }
