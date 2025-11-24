@@ -363,10 +363,10 @@
 
             <!-- Zakładki -->
             <div class="modal-tabs">
-                <button class="modal-tab active" onclick="switchTab('data')">Dane Odcinka</button>
-                <button class="modal-tab" onclick="switchTab('staff')">Ekipa</button>
-                <button class="modal-tab" onclick="switchTab('guests')">Goście</button>
-                <button class="modal-tab" onclick="switchTab('media')">Media</button>
+                <button class="modal-tab active" onclick="switchTab('data', this)">Dane Odcinka</button>
+                <button class="modal-tab" onclick="switchTab('staff', this)">Ekipa</button>
+                <button class="modal-tab" onclick="switchTab('guests', this)">Goście</button>
+                <button class="modal-tab" onclick="switchTab('media', this)">Media</button>
             </div>
 
             <!-- Zakładka: Dane Odcinka -->
@@ -392,8 +392,8 @@
                         <input type="text" class="form-control" id="episodeTitle" required>
                     </div>
                     <div class="form-group">
-                        <label for="episodeDate">Data Odcinka</label>
-                        <input type="date" class="form-control" id="episodeDate">
+                        <label for="episodeDate">Data Odcinka (YYYY-MM-DD)</label>
+                        <input type="text" class="form-control" id="episodeDate" placeholder="YYYY-MM-DD" pattern="\d{4}-\d{2}-\d{2}" title="Format: YYYY-MM-DD (np. 2024-12-31)">
                     </div>
                     <div class="form-group">
                         <div class="checkbox-group">
@@ -448,35 +448,55 @@
 
             <!-- Zakładka: Media -->
             <div id="tabMedia" class="tab-content">
-                <div class="scrollable-tab">
-                    <div style="margin-bottom: 15px;">
-                        <h4 style="margin-bottom: 10px;">Dostępne pliki w folderze sezonu:</h4>
-                        <div class="media-files-grid" id="mediaFilesGrid">
-                            <div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #666;">
-                                Ładowanie...
+                <!-- Pod-zakładki Media -->
+                <div class="sub-tabs">
+                    <button class="sub-tab active" onclick="switchMediaSubTab('all', this)">Wszystkie</button>
+                    <button class="sub-tab" onclick="switchMediaSubTab('assigned', this)">Przypisane</button>
+                    <button class="sub-tab" onclick="switchMediaSubTab('groups', this)">Grupy</button>
+                </div>
+
+                <!-- Pod-zakładka: Wszystkie -->
+                <div id="mediaSubTabAll" class="sub-tab-content active">
+                    <div class="scrollable-tab">
+                        <div style="margin-bottom: 15px;">
+                            <h4 style="margin-bottom: 10px;">Dostępne pliki w folderze sezonu:</h4>
+                            <div class="media-files-grid" id="mediaFilesGrid">
+                                <div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #666;">
+                                    Ładowanie...
+                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div style="margin-top: 20px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <h4>Przypisane media do odcinka:</h4>
-                        </div>
-                        <div class="assigned-media-list" id="assignedMediaList">
-                            <div style="text-align: center; padding: 20px; color: #666;">
-                                Brak przypisanych mediów
+                <!-- Pod-zakładka: Przypisane -->
+                <div id="mediaSubTabAssigned" class="sub-tab-content">
+                    <div class="scrollable-tab">
+                        <div style="margin-top: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <h4>Przypisane media do odcinka:</h4>
+                            </div>
+                            <div class="assigned-media-list" id="assignedMediaList">
+                                <div style="text-align: center; padding: 20px; color: #666;">
+                                    Brak przypisanych mediów
+                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <h4>Grupy Mediów (Playlisty):</h4>
-                            <button class="btn btn-primary btn-small" onclick="openAddMediaGroupModal()">+ Nowa Grupa</button>
-                        </div>
-                        <div id="mediaGroupsList">
-                            <div style="text-align: center; padding: 20px; color: #666;">
-                                Brak grup mediów
+                <!-- Pod-zakładka: Grupy -->
+                <div id="mediaSubTabGroups" class="sub-tab-content">
+                    <div class="scrollable-tab">
+                        <div style="margin-top: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <h4>Grupy Mediów (Playlisty):</h4>
+                                <button class="btn btn-primary btn-small" onclick="openAddMediaGroupModal()">+ Nowa Grupa</button>
+                            </div>
+                            <div id="mediaGroupsList">
+                                <div style="text-align: center; padding: 20px; color: #666;">
+                                    Brak grup mediów
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -730,13 +750,6 @@
                 </div>
 
                 <div style="margin-top: 20px;">
-                    <h4 style="margin-bottom: 10px;">Dostępne media przypisane do odcinka:</h4>
-                    <div id="availableMediaForGroup" style="max-height: 200px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; padding: 10px;">
-                        <div style="text-align: center; color: #666;">Brak dostępnych mediów</div>
-                    </div>
-                </div>
-
-                <div style="margin-top: 20px;">
                     <h4 style="margin-bottom: 10px;">Media w grupie:</h4>
                     <div id="groupMediaList" style="max-height: 300px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; padding: 10px;">
                         <div style="text-align: center; color: #666;">Brak mediów w grupie</div>
@@ -752,6 +765,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="/static/js/episodes-manager.js"></script>
 </body>
 </html>

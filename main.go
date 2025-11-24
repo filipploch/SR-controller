@@ -130,6 +130,7 @@ func main() {
 	// API REST dla Season
 	api := router.PathPrefix("/api").Subrouter()
 	api.HandleFunc("/seasons", seasonHandler.GetSeasons).Methods("GET")
+	api.HandleFunc("/seasons/next-number", seasonHandler.GetNextSeasonNumber).Methods("GET")
 	api.HandleFunc("/seasons", seasonHandler.CreateSeason).Methods("POST")
 	api.HandleFunc("/seasons/{id}", seasonHandler.GetSeason).Methods("GET")
 	api.HandleFunc("/seasons/{id}", seasonHandler.UpdateSeason).Methods("PUT")
@@ -138,6 +139,7 @@ func main() {
 
 	// API REST dla Episode
 	api.HandleFunc("/episodes", episodeHandler.GetEpisodes).Methods("GET")
+	api.HandleFunc("/episodes/next-numbers", episodeHandler.GetNextEpisodeNumbers).Methods("GET")
 	api.HandleFunc("/episodes", episodeHandler.CreateEpisode).Methods("POST")
 	api.HandleFunc("/episodes/{id}", episodeHandler.GetEpisode).Methods("GET")
 	api.HandleFunc("/episodes/{id}", episodeHandler.UpdateEpisode).Methods("PUT")
@@ -186,6 +188,7 @@ func main() {
 	api.HandleFunc("/episodes/{episode_id}/media/{id}", episodeMediaHandler.UpdateEpisodeMedia).Methods("PUT")
 	api.HandleFunc("/episodes/{episode_id}/media/{id}", episodeMediaHandler.DeleteEpisodeMedia).Methods("DELETE")
 	api.HandleFunc("/episodes/{episode_id}/media/{id}/set-current", episodeMediaHandler.SetCurrentMedia).Methods("POST")
+	api.HandleFunc("/episodes/{episode_id}/media/{id}/reorder", episodeMediaHandler.ReorderEpisodeMedia).Methods("PUT")
 	api.HandleFunc("/episodes/{episode_id}/media/upload", episodeMediaHandler.UploadMedia).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/media/files", episodeMediaHandler.ListMediaFiles).Methods("GET")
 
@@ -203,6 +206,9 @@ func main() {
 	api.HandleFunc("/media-groups/{id}", mediaGroupHandler.UpdateMediaGroup).Methods("PUT")
 	api.HandleFunc("/media-groups/{id}", mediaGroupHandler.DeleteMediaGroup).Methods("DELETE")
 	api.HandleFunc("/media-groups/{id}/items", mediaGroupHandler.GetMediaGroupItems).Methods("GET")
+	api.HandleFunc("/media-groups/{id}/items", mediaGroupHandler.AddItemToGroup).Methods("POST")
+	api.HandleFunc("/media-groups/{id}/reorder", mediaGroupHandler.ReorderMediaGroup).Methods("PUT")
+	api.HandleFunc("/media-groups/{group_id}/items/{id}/reorder", mediaGroupHandler.ReorderMediaGroupItem).Methods("PUT")
 	api.HandleFunc("/media-groups/{group_id}/media/{media_id}", mediaGroupHandler.AddMediaToGroup).Methods("POST")
 	api.HandleFunc("/media-groups/{group_id}/media/{media_id}", mediaGroupHandler.RemoveMediaFromGroup).Methods("DELETE")
 	api.HandleFunc("/episodes/{episode_id}/media-groups/{group_id}/set-current", mediaGroupHandler.SetCurrentMediaGroup).Methods("POST")

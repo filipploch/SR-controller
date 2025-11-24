@@ -204,3 +204,17 @@ func (h *SeasonHandler) SetCurrentSeason(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(season)
 }
+
+// GetNextSeasonNumber - GET /api/seasons/next-number
+func (h *SeasonHandler) GetNextSeasonNumber(w http.ResponseWriter, r *http.Request) {
+	var maxSeason models.Season
+	result := h.DB.Order("number DESC").First(&maxSeason)
+
+	nextNumber := 1
+	if result.Error == nil {
+		nextNumber = maxSeason.Number + 1
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int{"next_number": nextNumber})
+}

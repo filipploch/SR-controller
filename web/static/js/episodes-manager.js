@@ -80,12 +80,23 @@ function setupEventListeners() {
 }
 
 // ===== TAB SWITCHING =====
-function switchTab(tabName) {
+function switchTab(tabName, sourceElement) {
     // Update tab buttons
     document.querySelectorAll('.modal-tab').forEach(tab => {
         tab.classList.remove('active');
     });
-    event.target.classList.add('active');
+    
+    // Jeśli podano element źródłowy, ustaw go jako aktywny
+    if (sourceElement) {
+        sourceElement.classList.add('active');
+    } else {
+        // Jeśli nie, znajdź zakładkę odpowiadającą tabName
+        const tabButtons = document.querySelectorAll('.modal-tab');
+        const tabIndex = ['data', 'staff', 'guests', 'media'].indexOf(tabName);
+        if (tabIndex >= 0 && tabButtons[tabIndex]) {
+            tabButtons[tabIndex].classList.add('active');
+        }
+    }
 
     // Update tab content
     document.querySelectorAll('.tab-content').forEach(content => {
@@ -108,6 +119,28 @@ function switchTab(tabName) {
             // Reload staff dla opcji autora
             loadAssignedStaff().then(() => updateMediaStaffSelect());
         }
+    }
+}
+
+// ===== MEDIA SUB-TAB SWITCHING =====
+function switchMediaSubTab(subTabName, sourceElement) {
+    // Ukryj wszystkie pod-zakładki
+    document.querySelectorAll('.sub-tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    // Usuń active z przycisków pod-zakładek
+    document.querySelectorAll('.sub-tab').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Pokaż wybraną pod-zakładkę
+    const contentId = 'mediaSubTab' + subTabName.charAt(0).toUpperCase() + subTabName.slice(1);
+    document.getElementById(contentId).classList.add('active');
+    
+    // Zaznacz przycisk
+    if (sourceElement) {
+        sourceElement.classList.add('active');
     }
 }
 
@@ -165,7 +198,15 @@ function renderEpisodes() {
     }
 
     tbody.innerHTML = episodes.map(episode => {
-        const date = episode.episode_date ? new Date(episode.episode_date).toLocaleDateString('pl-PL') : '-';
+        // Formatuj datę jako YYYY-MM-DD
+        let date = '-';
+        if (episode.episode_date) {
+            const d = new Date(episode.episode_date);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            date = `${yyyy}-${mm}-${dd}`;
+        }
         const season = episode.season ? episode.season.number : '-';
         
         return `
@@ -189,7 +230,7 @@ function renderEpisodes() {
     }).join('');
 }
 
-function openCreateModal() {
+async function openCreateModal() {
     document.getElementById('modalTitle').textContent = 'Nowy Odcinek';
     document.getElementById('episodeForm').reset();
     document.getElementById('episodeId').value = '';
@@ -198,9 +239,34 @@ function openCreateModal() {
     assignedGuests = [];
     assignedMedia = [];
     
+    // Pobierz następne numery odcinków
+    try {
+        const response = await fetch('/api/episodes/next-numbers');
+        const data = await response.json();
+        
+        // Ustaw aktualny sezon
+        if (data.current_season_id) {
+            document.getElementById('episodeSeason').value = data.current_season_id;
+        }
+        
+        // Ustaw numery
+        document.getElementById('episodeNumber').value = data.next_episode_number;
+        document.getElementById('seasonEpisode').value = data.next_season_episode;
+    } catch (error) {
+        console.error('Błąd pobierania następnych numerów:', error);
+        document.getElementById('episodeNumber').value = 1;
+        document.getElementById('seasonEpisode').value = 1;
+    }
+    
+    // Ustaw dzisiejszą datę w formacie YYYY-MM-DD
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    document.getElementById('episodeDate').value = `${yyyy}-${mm}-${dd}`;
+    
     // Switch to first tab
     switchTab('data');
-    document.querySelector('.modal-tab').click();
     
     document.getElementById('episodeModal').classList.add('active');
 }
@@ -226,7 +292,6 @@ function openEditModal(id) {
     
     // Switch to first tab
     switchTab('data');
-    document.querySelector('.modal-tab').click();
     
     document.getElementById('episodeModal').classList.add('active');
 }
@@ -240,12 +305,29 @@ async function saveEpisode() {
     const id = document.getElementById('episodeId').value;
     const dateValue = document.getElementById('episodeDate').value;
     
+    // Przygotuj datę - jeśli nie podano, użyj dzisiejszej w formacie YYYY-MM-DD
+    let episodeDate = dateValue;
+    if (!episodeDate) {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        episodeDate = `${yyyy}-${mm}-${dd}`;
+    }
+    
+    // Walidacja formatu daty YYYY-MM-DD
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(episodeDate)) {
+        alert('Data musi być w formacie YYYY-MM-DD (np. 2024-12-31)');
+        return;
+    }
+    
     const data = {
         season_id: parseInt(document.getElementById('episodeSeason').value),
         episode_number: parseInt(document.getElementById('episodeNumber').value),
         season_episode: parseInt(document.getElementById('seasonEpisode').value),
         title: document.getElementById('episodeTitle').value,
-        episode_date: dateValue ? new Date(dateValue).toISOString() : new Date().toISOString(),
+        episode_date: episodeDate + 'T00:00:00Z', // Dodaj czas dla kompatybilności z backendem
         is_current: document.getElementById('episodeIsCurrent').checked
     };
 
@@ -928,15 +1010,24 @@ function renderMediaFiles() {
         return;
     }
 
-    container.innerHTML = availableMediaFiles.map(file => `
-        <div class="media-file-card" onclick="selectMediaFile('${file.path}', '${file.name}', ${file.duration})">
-            <div class="media-file-name">${file.name}</div>
-            <div class="media-file-info">
-                Typ: ${file.type}<br>
-                ${file.duration ? `Czas: ${formatDuration(file.duration)}` : ''}
+    // Pobierz ścieżki już przypisanych plików
+    const assignedFilePaths = assignedMedia.map(m => m.file_path).filter(Boolean);
+
+    container.innerHTML = availableMediaFiles.map(file => {
+        const isAssigned = assignedFilePaths.includes(file.path);
+        const assignedClass = isAssigned ? 'assigned' : '';
+        const assignedBadge = isAssigned ? '<span class="badge badge-success" style="font-size: 8px; margin-left: 5px;">PRZYPISANY</span>' : '';
+        
+        return `
+            <div class="media-file-card ${assignedClass}" onclick="${isAssigned ? '' : `selectMediaFile('${file.path}', '${file.name}', ${file.duration})`}" style="${isAssigned ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
+                <div class="media-file-name">${file.name}${assignedBadge}</div>
+                <div class="media-file-info">
+                    Typ: ${file.type}<br>
+                    ${file.duration ? `Czas: ${formatDuration(file.duration)}` : ''}
+                </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function selectMediaFile(path, name, duration) {
@@ -973,7 +1064,8 @@ async function assignMedia() {
         description: document.getElementById('mediaDescription').value,
         file_path: filePath,
         duration: parseInt(document.getElementById('mediaFileDuration').value),
-        episode_staff_id: staffId ? parseInt(staffId) : null
+        episode_staff_id: staffId ? parseInt(staffId) : null,
+        order: 0 // Domyślna kolejność
     };
 
     try {
@@ -993,7 +1085,8 @@ async function assignMedia() {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
-                            episode_media_id: newMedia.id
+                            episode_media_id: newMedia.id,
+                            order: 0
                         })
                     });
                 } catch (error) {
@@ -1004,6 +1097,9 @@ async function assignMedia() {
             
             closeAssignMediaModal();
             await loadAssignedMedia();
+        } else if (response.status === 409) {
+            // Konflikt - plik już przypisany
+            alert('Ten plik jest już przypisany do tego odcinka');
         } else {
             const error = await response.text();
             alert('Błąd przypisywania media: ' + error);
@@ -1034,6 +1130,9 @@ function renderAssignedMedia() {
         return;
     }
 
+    // Sortuj po order
+    assignedMedia.sort((a, b) => a.order - b.order);
+
     container.innerHTML = assignedMedia.map(media => {
         const sceneName = media.scene ? media.scene.name : 'Brak';
         const authorName = media.episode_staff && media.episode_staff.staff ? 
@@ -1043,7 +1142,7 @@ function renderAssignedMedia() {
             '<span class="badge badge-success">WCZYTANY</span>' : '';
         
         return `
-            <div class="assigned-media-item">
+            <div class="assigned-media-item" data-media-id="${media.id}">
                 <div class="media-item-details">
                     <div class="media-item-title">${media.title} ${currentBadge}</div>
                     <div class="media-item-meta">
@@ -1055,12 +1154,14 @@ function renderAssignedMedia() {
                     </div>
                 </div>
                 <div class="list-item-actions">
-                    ${!media.is_current ? `<button class="btn btn-success btn-icon" onclick="setCurrentMedia(${media.id})" title="Wczytaj do źródła Single">⬆</button>` : ''}
                     <button class="btn btn-danger btn-icon" onclick="removeMediaFromEpisode(${media.id})">×</button>
                 </div>
             </div>
         `;
     }).join('');
+    
+    // Inicjalizuj Sortable dla drag & drop
+    initAssignedMediaSortable();
 }
 
 async function removeMediaFromEpisode(mediaId) {
@@ -1082,23 +1183,6 @@ async function removeMediaFromEpisode(mediaId) {
     }
 }
 
-async function setCurrentMedia(mediaId) {
-    try {
-        const response = await fetch(`/api/episodes/${currentEpisodeId}/media/${mediaId}/set-current`, {
-            method: 'POST'
-        });
-
-        if (response.ok) {
-            await loadAssignedMedia();
-        } else {
-            alert('Błąd ustawiania media');
-        }
-    } catch (error) {
-        console.error('Błąd:', error);
-        alert('Błąd połączenia');
-    }
-}
-
 // ===== UTILITIES =====
 function formatDuration(seconds) {
     const minutes = Math.floor(seconds / 60);
@@ -1108,8 +1192,10 @@ function formatDuration(seconds) {
 
 // ===== MEDIA GROUPS =====
 async function loadMediaGroups() {
+    if (!currentEpisodeId) return;
+    
     try {
-        const response = await fetch('/api/media-groups');
+        const response = await fetch(`/api/media-groups?episode_id=${currentEpisodeId}`);
         mediaGroups = await response.json();
         renderMediaGroups();
     } catch (error) {
@@ -1126,12 +1212,11 @@ function renderMediaGroups() {
     }
 
     container.innerHTML = mediaGroups.map(group => {
-        // Policz ile mediów jest w grupie (potrzebujemy zapytania do API)
-        const isActive = false; // TODO: sprawdź czy grupa jest aktywna
+        const isActive = group.is_current || false;
         const activeClass = isActive ? 'active' : '';
         
         return `
-            <div class="media-group-card ${activeClass}" onclick="openManageMediaGroupModal(${group.id})">
+            <div class="media-group-card ${activeClass}" data-group-id="${group.id}" onclick="openManageMediaGroupModal(${group.id})">
                 <div class="media-group-header">
                     <div>
                         <div class="media-group-name">${group.name}</div>
@@ -1142,6 +1227,9 @@ function renderMediaGroups() {
             </div>
         `;
     }).join('');
+    
+    // Inicjalizuj Sortable dla drag & drop
+    initMediaGroupsSortable();
 }
 
 function openAddMediaGroupModal() {
@@ -1154,7 +1242,13 @@ function closeAddMediaGroupModal() {
 }
 
 async function createMediaGroup() {
+    if (!currentEpisodeId) {
+        alert('Najpierw zapisz odcinek');
+        return;
+    }
+
     const data = {
+        episode_id: currentEpisodeId,
         name: document.getElementById('mediaGroupName').value,
         description: document.getElementById('mediaGroupDescription').value
     };
@@ -1187,8 +1281,7 @@ async function openManageMediaGroupModal(groupId) {
     document.getElementById('manageMediaGroupTitle').textContent = currentMediaGroup.name;
     document.getElementById('mediaGroupInfo').textContent = currentMediaGroup.description || 'Brak opisu';
 
-    // Załaduj dostępne media i media w grupie
-    await loadAvailableMediaForGroup(groupId);
+    // Załaduj media w grupie
     await loadGroupMediaItems(groupId);
 
     document.getElementById('manageMediaGroupModal').classList.add('active');
@@ -1197,38 +1290,6 @@ async function openManageMediaGroupModal(groupId) {
 function closeManageMediaGroupModal() {
     document.getElementById('manageMediaGroupModal').classList.remove('active');
     currentMediaGroup = null;
-}
-
-async function loadAvailableMediaForGroup(groupId) {
-    const container = document.getElementById('availableMediaForGroup');
-    
-    // Pobierz media już w grupie
-    let groupMediaIds = [];
-    try {
-        const response = await fetch(`/api/media-groups/${groupId}/items`);
-        const items = await response.json();
-        groupMediaIds = items.map(item => item.episode_media_id);
-    } catch (error) {
-        console.error('Błąd ładowania mediów grupy:', error);
-    }
-
-    // Filtruj dostępne media (przypisane do odcinka ale nie w grupie)
-    const available = assignedMedia.filter(m => !groupMediaIds.includes(m.id));
-
-    if (available.length === 0) {
-        container.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">Wszystkie media są już w grupach</div>';
-        return;
-    }
-
-    container.innerHTML = available.map(media => `
-        <div class="available-media-item">
-            <div>
-                <strong>${media.title}</strong>
-                <div style="font-size: 10px; color: #666;">${media.scene ? media.scene.name : ''}</div>
-            </div>
-            <button class="btn btn-success btn-icon" onclick="addMediaToCurrentGroup(${media.id})" title="Dodaj do grupy">+</button>
-        </div>
-    `).join('');
 }
 
 async function loadGroupMediaItems(groupId) {
@@ -1244,12 +1305,12 @@ async function loadGroupMediaItems(groupId) {
         }
 
         // Sortuj po kolejności
-        items.sort((a, b) => a.episode_order - b.episode_order);
+        items.sort((a, b) => a.order - b.order);
 
         container.innerHTML = items.map(item => {
             const media = item.episode_media;
             return `
-                <div class="group-media-item">
+                <div class="group-media-item" data-item-id="${item.id}">
                     <div style="flex: 1;">
                         <strong>${media.title}</strong>
                         <div style="font-size: 10px; color: #666;">
@@ -1258,9 +1319,6 @@ async function loadGroupMediaItems(groupId) {
                         </div>
                     </div>
                     <div class="group-media-order">
-                        <input type="number" value="${item.episode_order}" min="1" 
-                               onchange="updateMediaOrder(${groupId}, ${item.id}, this.value)"
-                               title="Kolejność">
                         <button class="btn btn-danger btn-icon" 
                                 onclick="removeMediaFromCurrentGroup(${groupId}, ${media.id})"
                                 title="Usuń z grupy">×</button>
@@ -1268,6 +1326,9 @@ async function loadGroupMediaItems(groupId) {
                 </div>
             `;
         }).join('');
+        
+        // Inicjalizuj Sortable dla drag & drop
+        initGroupMediaItemsSortable();
     } catch (error) {
         console.error('Błąd ładowania mediów grupy:', error);
         container.innerHTML = '<div style="text-align: center; color: #f00; padding: 20px;">Błąd ładowania</div>';
@@ -1283,7 +1344,7 @@ async function addMediaToCurrentGroup(mediaId) {
         const response = await fetch(`/api/media-groups/${groupId}/items`);
         const items = await response.json();
         if (items.length > 0) {
-            maxOrder = Math.max(...items.map(i => i.episode_order));
+            maxOrder = Math.max(...items.map(i => i.order));
         }
     } catch (error) {
         console.error('Błąd:', error);
@@ -1293,11 +1354,10 @@ async function addMediaToCurrentGroup(mediaId) {
         const response = await fetch(`/api/media-groups/${groupId}/media/${mediaId}`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ episode_order: maxOrder + 1 })
+            body: JSON.stringify({ order: maxOrder + 1 })
         });
 
         if (response.ok) {
-            await loadAvailableMediaForGroup(groupId);
             await loadGroupMediaItems(groupId);
         } else {
             const error = await response.text();
@@ -1318,7 +1378,6 @@ async function removeMediaFromCurrentGroup(groupId, mediaId) {
         });
 
         if (response.ok) {
-            await loadAvailableMediaForGroup(groupId);
             await loadGroupMediaItems(groupId);
         } else {
             alert('Błąd usuwania');
@@ -1327,13 +1386,6 @@ async function removeMediaFromCurrentGroup(groupId, mediaId) {
         console.error('Błąd:', error);
         alert('Błąd połączenia');
     }
-}
-
-async function updateMediaOrder(groupId, itemId, newOrder) {
-    // TODO: Endpoint do aktualizacji kolejności
-    console.log('Update order:', groupId, itemId, newOrder);
-    // Możemy to zrobić przez usunięcie i dodanie z nową kolejnością
-    // lub dodać dedykowany endpoint
 }
 
 async function deleteMediaGroup() {
@@ -1377,4 +1429,87 @@ async function setMediaGroupAsCurrent() {
         console.error('Błąd:', error);
         alert('Błąd połączenia');
     }
+}
+// ===== DRAG & DROP - SORTABLE =====
+function initAssignedMediaSortable() {
+    const container = document.getElementById('assignedMediaList');
+    if (!container || assignedMedia.length === 0) return;
+    
+    new Sortable(container, {
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        dragClass: 'sortable-drag',
+        onEnd: async function(evt) {
+            const itemId = evt.item.dataset.mediaId;
+            const newOrder = evt.newIndex;
+            
+            try {
+                await fetch(`/api/episodes/${currentEpisodeId}/media/${itemId}/reorder`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ order: newOrder })
+                });
+                await loadAssignedMedia();
+            } catch (error) {
+                console.error('Błąd aktualizacji kolejności:', error);
+                alert('Błąd aktualizacji kolejności');
+            }
+        }
+    });
+}
+
+function initMediaGroupsSortable() {
+    const container = document.getElementById('mediaGroupsList');
+    if (!container || mediaGroups.length === 0) return;
+    
+    new Sortable(container, {
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        dragClass: 'sortable-drag',
+        onEnd: async function(evt) {
+            const groupId = evt.item.dataset.groupId;
+            const newOrder = evt.newIndex;
+            
+            try {
+                await fetch(`/api/media-groups/${groupId}/reorder`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ order: newOrder })
+                });
+                await loadMediaGroups();
+            } catch (error) {
+                console.error('Błąd aktualizacji kolejności:', error);
+                alert('Błąd aktualizacji kolejności');
+            }
+        }
+    });
+}
+
+function initGroupMediaItemsSortable() {
+    const container = document.getElementById('groupMediaList');
+    if (!container || !currentMediaGroup) return;
+    
+    const groupId = currentMediaGroup.id;
+    
+    new Sortable(container, {
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        dragClass: 'sortable-drag',
+        onEnd: async function(evt) {
+            const itemId = evt.item.dataset.itemId;
+            const newOrder = evt.newIndex;
+            
+            try {
+                await fetch(`/api/media-groups/${groupId}/items/${itemId}/reorder`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ order: newOrder })
+                });
+                await loadGroupMediaItems(groupId);
+            } catch (error) {
+                console.error('Błąd aktualizacji kolejności:', error);
+                alert('Błąd aktualizacji kolejności');
+            }
+        }
+    });
 }

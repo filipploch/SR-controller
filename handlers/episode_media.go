@@ -71,6 +71,22 @@ func (h *EpisodeMediaHandler) CreateEpisodeMedia(w http.ResponseWriter, r *http.
 
 	media.EpisodeID = uint(episodeID)
 
+	// Sprawdź czy ten sam plik nie jest już przypisany do tego odcinka
+	if media.FilePath != nil && *media.FilePath != "" {
+		var existingMedia models.EpisodeMedia
+		result := h.DB.Where("episode_id = ? AND file_path = ?", episodeID, *media.FilePath).First(&existingMedia)
+		if result.Error == nil {
+			// Znaleziono duplikat
+			http.Error(w, "Ten plik jest już przypisany do tego odcinka", http.StatusConflict)
+			return
+		}
+	}
+
+	// Automatycznie ustaw kolejność jeśli nie podano
+	if media.Order == 0 {
+		media.Order = models.GetNextEpisodeMediaOrder(h.DB, uint(episodeID))
+	}
+
 	// Jeśli podano FilePath, odczytaj duration
 	if media.FilePath != nil && *media.FilePath != "" {
 		fullPath := filepath.Join(h.MediaPath, *media.FilePath)
@@ -132,6 +148,7 @@ func (h *EpisodeMediaHandler) UpdateEpisodeMedia(w http.ResponseWriter, r *http.
 	media.Description = updateData.Description
 	media.FilePath = updateData.FilePath
 	media.URL = updateData.URL
+	media.Order = updateData.Order
 
 	// Jeśli zmieniono FilePath, odczytaj nowy duration
 	if media.FilePath != nil && *media.FilePath != "" {
@@ -186,6 +203,67 @@ func (h *EpisodeMediaHandler) DeleteEpisodeMedia(w http.ResponseWriter, r *http.
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ReorderEpisodeMedia - PUT /api/episodes/{episode_id}/media/{id}/reorder
+func (h *EpisodeMediaHandler) ReorderEpisodeMedia(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+	
+	mediaID, err := strconv.ParseUint(vars["id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid media ID", http.StatusBadRequest)
+		return
+	}
+
+	var data struct {
+		Order int `json:"order"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = h.DB.Transaction(func(tx *gorm.DB) error {
+		var media models.EpisodeMedia
+		if err := tx.First(&media, mediaID).Error; err != nil {
+			return err
+		}
+
+		oldOrder := media.Order
+		newOrder := data.Order
+
+		if newOrder > oldOrder {
+			// Przesuń w dół elementy między starą a nową pozycją
+			tx.Model(&models.EpisodeMedia{}).
+				Where("episode_id = ? AND \"order\" > ? AND \"order\" <= ?", episodeID, oldOrder, newOrder).
+				UpdateColumn("order", gorm.Expr("\"order\" - 1"))
+		} else if newOrder < oldOrder {
+			// Przesuń w górę elementy między nową a starą pozycją
+			tx.Model(&models.EpisodeMedia{}).
+				Where("episode_id = ? AND \"order\" >= ? AND \"order\" < ?", episodeID, newOrder, oldOrder).
+				UpdateColumn("order", gorm.Expr("\"order\" + 1"))
+		}
+
+		// Ustaw nową kolejność
+		if err := tx.Model(&media).Update("order", newOrder).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 // UploadMedia - POST /api/episodes/{episode_id}/media/upload

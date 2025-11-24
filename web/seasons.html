@@ -146,10 +146,21 @@
         }
 
         // Otwórz modal tworzenia
-        function openCreateModal() {
+        async function openCreateModal() {
             document.getElementById('modalTitle').textContent = 'Nowy Sezon';
             document.getElementById('seasonForm').reset();
             document.getElementById('seasonId').value = '';
+            
+            // Pobierz następny numer sezonu
+            try {
+                const response = await fetch('/api/seasons/next-number');
+                const data = await response.json();
+                document.getElementById('seasonNumber').value = data.next_number;
+            } catch (error) {
+                console.error('Błąd pobierania następnego numeru:', error);
+                document.getElementById('seasonNumber').value = 1;
+            }
+            
             document.getElementById('seasonModal').classList.add('active');
         }
 

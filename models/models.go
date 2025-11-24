@@ -109,8 +109,12 @@ type EpisodeGuest struct {
 // MediaGroup reprezentuje grupę mediów (np. "Blok reportaży", "Playlista muzyczna")
 type MediaGroup struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
+	EpisodeID   uint      `gorm:"index;not null" json:"episode_id"`    // Przypisanie do odcinka
+	Episode     Episode   `gorm:"foreignKey:EpisodeID" json:"episode"` // Relacja do odcinka
 	Name        string    `gorm:"size:200;not null" json:"name"`
 	Description string    `gorm:"type:text" json:"description"`
+	Order       int       `gorm:"not null" json:"order"`                 // Kolejność w odcinku (unique per episode)
+	IsCurrent   bool      `gorm:"default:false;index" json:"is_current"` // Czy aktywna w odcinku
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -123,8 +127,8 @@ type EpisodeMediaGroup struct {
 	EpisodeMedia   EpisodeMedia `gorm:"foreignKey:EpisodeMediaID" json:"episode_media"`
 	MediaGroupID   uint         `gorm:"index;not null" json:"media_group_id"`
 	MediaGroup     MediaGroup   `gorm:"foreignKey:MediaGroupID" json:"media_group"`
-	IsCurrent      bool         `gorm:"default:false" json:"is_current"` // Czy grupa jest aktywna w źródle List
-	EpisodeOrder   int          `gorm:"default:0" json:"episode_order"`  // Kolejność w grupie
+	Order          int          `gorm:"not null" json:"order"`           // Kolejność w grupie (unique per group)
+	IsCurrent      bool         `gorm:"default:false" json:"is_current"` // Czy media jest aktywne w źródle List
 	CreatedAt      time.Time    `json:"created_at"`
 }
 
@@ -167,6 +171,7 @@ type EpisodeMedia struct {
 	FilePath       *string             `gorm:"size:1000" json:"file_path"`                    // Ścieżka do pliku (nullable)
 	URL            *string             `gorm:"size:1000" json:"url"`                          // URL jeśli zewnętrzne (nullable)
 	Duration       int                 `json:"duration"`                                      // Czas trwania w sekundach
+	Order          int                 `gorm:"default:0" json:"order"`                        // Kolejność w odcinku
 	IsCurrent      bool                `gorm:"default:false" json:"is_current"`               // Czy wczytany w źródło Single
 	MediaGroups    []EpisodeMediaGroup `gorm:"foreignKey:EpisodeMediaID" json:"media_groups"` // Przynależność do grup
 	CreatedAt      time.Time           `json:"created_at"`
@@ -350,20 +355,49 @@ func SetCurrentEpisodeMedia(db *gorm.DB, episodeID uint, mediaID uint) error {
 func SetCurrentMediaGroup(db *gorm.DB, episodeID uint, groupID uint) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		// Wyłącz wszystkie grupy w tym odcinku
-		if err := tx.Model(&EpisodeMediaGroup{}).
-			Joins("JOIN episode_media ON episode_media_groups.episode_media_id = episode_media.id").
-			Where("episode_media.episode_id = ? AND is_current = ?", episodeID, true).
+		if err := tx.Model(&MediaGroup{}).
+			Where("episode_id = ? AND is_current = ?", episodeID, true).
 			Update("is_current", false).Error; err != nil {
 			return err
 		}
 
 		// Włącz wybraną grupę
-		if err := tx.Model(&EpisodeMediaGroup{}).
-			Where("media_group_id = ?", groupID).
+		if err := tx.Model(&MediaGroup{}).
+			Where("id = ?", groupID).
 			Update("is_current", true).Error; err != nil {
 			return err
 		}
 
 		return nil
 	})
+}
+
+// GetNextEpisodeMediaOrder zwraca następny dostępny numer kolejności dla media w odcinku
+func GetNextEpisodeMediaOrder(db *gorm.DB, episodeID uint) int {
+	var maxMedia EpisodeMedia
+	result := db.Where("episode_id = ?", episodeID).Order("\"order\" DESC").First(&maxMedia)
+	if result.Error != nil {
+		return 0
+	}
+	return maxMedia.Order + 1
+}
+
+// GetNextMediaGroupOrder zwraca następny dostępny numer kolejności dla grupy w odcinku
+func GetNextMediaGroupOrder(db *gorm.DB, episodeID uint) int {
+	var maxGroup MediaGroup
+	result := db.Where("episode_id = ?", episodeID).Order("\"order\" DESC").First(&maxGroup)
+	if result.Error != nil {
+		return 0
+	}
+	return maxGroup.Order + 1
+}
+
+// GetNextMediaGroupItemOrder zwraca następny dostępny numer kolejności dla media w grupie
+func GetNextMediaGroupItemOrder(db *gorm.DB, groupID uint) int {
+	var maxItem EpisodeMediaGroup
+	result := db.Where("media_group_id = ?", groupID).Order("\"order\" DESC").First(&maxItem)
+	if result.Error != nil {
+		return 0
+	}
+	return maxItem.Order + 1
 }

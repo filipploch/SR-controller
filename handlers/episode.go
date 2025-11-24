@@ -200,3 +200,38 @@ func (h *EpisodeHandler) SetCurrentEpisode(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(episode)
 }
+
+// GetNextEpisodeNumbers - GET /api/episodes/next-numbers
+func (h *EpisodeHandler) GetNextEpisodeNumbers(w http.ResponseWriter, r *http.Request) {
+	// Pobierz aktualny sezon
+	currentSeason, err := models.GetCurrentSeason(h.DB)
+	var currentSeasonID uint = 0
+	if err == nil && currentSeason != nil {
+		currentSeasonID = currentSeason.ID
+	}
+
+	// Pobierz maksymalny numer odcinka (ciągły)
+	var maxEpisode models.Episode
+	resultAll := h.DB.Order("episode_number DESC").First(&maxEpisode)
+	nextEpisodeNumber := 1
+	if resultAll.Error == nil {
+		nextEpisodeNumber = maxEpisode.EpisodeNumber + 1
+	}
+
+	// Pobierz maksymalny numer w sezonie
+	nextSeasonEpisode := 1
+	if currentSeasonID > 0 {
+		var maxSeasonEpisode models.Episode
+		resultSeason := h.DB.Where("season_id = ?", currentSeasonID).Order("season_episode DESC").First(&maxSeasonEpisode)
+		if resultSeason.Error == nil {
+			nextSeasonEpisode = maxSeasonEpisode.SeasonEpisode + 1
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"current_season_id":  currentSeasonID,
+		"next_episode_number": nextEpisodeNumber,
+		"next_season_episode": nextSeasonEpisode,
+	})
+}

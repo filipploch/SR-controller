@@ -21,7 +21,14 @@ func NewMediaGroupHandler(db *gorm.DB) *MediaGroupHandler {
 // GetMediaGroups - GET /api/media-groups
 func (h *MediaGroupHandler) GetMediaGroups(w http.ResponseWriter, r *http.Request) {
 	var groups []models.MediaGroup
-	result := h.DB.Order("name ASC").Find(&groups)
+	query := h.DB.Order("\"order\" ASC")
+
+	// Filtruj po episode_id jeśli podano
+	if episodeID := r.URL.Query().Get("episode_id"); episodeID != "" {
+		query = query.Where("episode_id = ?", episodeID)
+	}
+
+	result := query.Find(&groups)
 
 	if result.Error != nil {
 		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
@@ -63,6 +70,11 @@ func (h *MediaGroupHandler) CreateMediaGroup(w http.ResponseWriter, r *http.Requ
 	if err := json.NewDecoder(r.Body).Decode(&group); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	// Automatycznie ustaw kolejność jeśli nie podano
+	if group.Order == 0 {
+		group.Order = models.GetNextMediaGroupOrder(h.DB, group.EpisodeID)
 	}
 
 	if err := h.DB.Create(&group).Error; err != nil {
@@ -146,7 +158,7 @@ func (h *MediaGroupHandler) GetMediaGroupItems(w http.ResponseWriter, r *http.Re
 	result := h.DB.Preload("EpisodeMedia.Scene").
 		Preload("EpisodeMedia.EpisodeStaff.Staff").
 		Where("media_group_id = ?", id).
-		Order("episode_order ASC").
+		Order("\"order\" ASC").
 		Find(&items)
 
 	if result.Error != nil {
@@ -156,6 +168,72 @@ func (h *MediaGroupHandler) GetMediaGroupItems(w http.ResponseWriter, r *http.Re
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(items)
+}
+
+// AddItemToGroup - POST /api/media-groups/{id}/items
+// Dodaje media do grupy przyjmując episode_media_id w body
+func (h *MediaGroupHandler) AddItemToGroup(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	groupID, err := strconv.ParseUint(vars["id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid group ID", http.StatusBadRequest)
+		return
+	}
+
+	var data struct {
+		EpisodeMediaID uint `json:"episode_media_id"`
+		Order          int  `json:"order"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Sprawdź czy media istnieje
+	var media models.EpisodeMedia
+	if err := h.DB.First(&media, data.EpisodeMediaID).Error; err != nil {
+		http.Error(w, "Media not found", http.StatusNotFound)
+		return
+	}
+
+	// Sprawdź czy grupa istnieje
+	var group models.MediaGroup
+	if err := h.DB.First(&group, groupID).Error; err != nil {
+		http.Error(w, "Group not found", http.StatusNotFound)
+		return
+	}
+
+	// Sprawdź czy już nie jest przypisane
+	var existing models.EpisodeMediaGroup
+	if err := h.DB.Where("episode_media_id = ? AND media_group_id = ?", data.EpisodeMediaID, groupID).First(&existing).Error; err == nil {
+		http.Error(w, "Media already in group", http.StatusConflict)
+		return
+	}
+
+	// Automatycznie ustaw kolejność jeśli nie podano
+	order := data.Order
+	if order == 0 {
+		order = models.GetNextMediaGroupItemOrder(h.DB, uint(groupID))
+	}
+
+	assignment := models.EpisodeMediaGroup{
+		EpisodeMediaID: data.EpisodeMediaID,
+		MediaGroupID:   uint(groupID),
+		Order:          order,
+		IsCurrent:      false,
+	}
+
+	if err := h.DB.Create(&assignment).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Załaduj relacje
+	h.DB.Preload("EpisodeMedia").Preload("MediaGroup").First(&assignment, assignment.ID)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(assignment)
 }
 
 // AddMediaToGroup - POST /api/media-groups/{group_id}/media/{media_id}
@@ -174,7 +252,7 @@ func (h *MediaGroupHandler) AddMediaToGroup(w http.ResponseWriter, r *http.Reque
 	}
 
 	var data struct {
-		EpisodeOrder int `json:"episode_order"`
+		Order int `json:"order"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -205,7 +283,7 @@ func (h *MediaGroupHandler) AddMediaToGroup(w http.ResponseWriter, r *http.Reque
 	assignment := models.EpisodeMediaGroup{
 		EpisodeMediaID: uint(mediaID),
 		MediaGroupID:   uint(groupID),
-		EpisodeOrder:   data.EpisodeOrder,
+		Order:          data.Order,
 		IsCurrent:      false,
 	}
 
@@ -276,5 +354,115 @@ func (h *MediaGroupHandler) SetCurrentMediaGroup(w http.ResponseWriter, r *http.
 	}
 
 	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// ReorderMediaGroup - PUT /api/media-groups/{id}/reorder
+func (h *MediaGroupHandler) ReorderMediaGroup(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	groupID, err := strconv.ParseUint(vars["id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid group ID", http.StatusBadRequest)
+		return
+	}
+
+	var data struct {
+		Order int `json:"order"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = h.DB.Transaction(func(tx *gorm.DB) error {
+		var group models.MediaGroup
+		if err := tx.First(&group, groupID).Error; err != nil {
+			return err
+		}
+
+		oldOrder := group.Order
+		newOrder := data.Order
+
+		if newOrder > oldOrder {
+			tx.Model(&models.MediaGroup{}).
+				Where("episode_id = ? AND \"order\" > ? AND \"order\" <= ?", group.EpisodeID, oldOrder, newOrder).
+				UpdateColumn("order", gorm.Expr("\"order\" - 1"))
+		} else if newOrder < oldOrder {
+			tx.Model(&models.MediaGroup{}).
+				Where("episode_id = ? AND \"order\" >= ? AND \"order\" < ?", group.EpisodeID, newOrder, oldOrder).
+				UpdateColumn("order", gorm.Expr("\"order\" + 1"))
+		}
+
+		if err := tx.Model(&group).Update("order", newOrder).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// ReorderMediaGroupItem - PUT /api/media-groups/{group_id}/items/{id}/reorder
+func (h *MediaGroupHandler) ReorderMediaGroupItem(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	groupID, err := strconv.ParseUint(vars["group_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid group ID", http.StatusBadRequest)
+		return
+	}
+
+	itemID, err := strconv.ParseUint(vars["id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid item ID", http.StatusBadRequest)
+		return
+	}
+
+	var data struct {
+		Order int `json:"order"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = h.DB.Transaction(func(tx *gorm.DB) error {
+		var item models.EpisodeMediaGroup
+		if err := tx.First(&item, itemID).Error; err != nil {
+			return err
+		}
+
+		oldOrder := item.Order
+		newOrder := data.Order
+
+		if newOrder > oldOrder {
+			tx.Model(&models.EpisodeMediaGroup{}).
+				Where("media_group_id = ? AND \"order\" > ? AND \"order\" <= ?", groupID, oldOrder, newOrder).
+				UpdateColumn("order", gorm.Expr("\"order\" - 1"))
+		} else if newOrder < oldOrder {
+			tx.Model(&models.EpisodeMediaGroup{}).
+				Where("media_group_id = ? AND \"order\" >= ? AND \"order\" < ?", groupID, newOrder, oldOrder).
+				UpdateColumn("order", gorm.Expr("\"order\" + 1"))
+		}
+
+		if err := tx.Model(&item).Update("order", newOrder).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
