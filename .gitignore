@@ -39,3 +39,6 @@ config.local.yaml
 # Pliki coverage
 coverage.txt
 profile.out
+
+# Pliki backup
+backup*.*

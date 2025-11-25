@@ -6,8 +6,6 @@ let allGuests = [];
 let staffTypes = [];
 let guestTypes = [];
 let sources = [];
-let mediaSceneId = null;
-let reportazeSceneId = null;
 let currentEpisodeId = null;
 let assignedStaff = [];
 let assignedGuests = [];
@@ -949,19 +947,12 @@ async function updateGuestAssignment() {
 async function loadMediaScenes() {
     try {
         const response = await fetch('/api/scenes/media');
+        if (!response.ok) return;
+        
         const scenes = await response.json();
-        
-        // Store scenes
-        window.mediaScenes = scenes;
-        
-        // Zapisz ID scen
-        const mediaScene = scenes.find(s => s.name === 'MEDIA');
-        const reportazeScene = scenes.find(s => s.name === 'REPORTAZE');
-        
-        if (mediaScene) mediaSceneId = mediaScene.id;
-        if (reportazeScene) reportazeSceneId = reportazeScene.id;
-        
-        updateMediaStaffSelect();
+        // Nie zapisuj już do globalnych zmiennych mediaSceneId i reportazeSceneId
+        // Bo te nie są już potrzebne
+        console.log('Sceny mediów:', scenes);
     } catch (error) {
         console.error('Błąd ładowania scen:', error);
     }
@@ -976,45 +967,16 @@ function updateMediaStaffSelect() {
         ).join('');
 }
 
-function updateMediaGroupSelect() {
-    const container = document.getElementById('mediaGroupCheckboxes');
-    if (!container) return; // Element nie istnieje jeśli formularz nie jest otwarty
+async function loadMediaFiles() {
+    if (!currentEpisodeId) return;
     
-    if (mediaGroups.length === 0) {
-        container.innerHTML = '<div style="text-align: center; color: #666; font-size: 11px;">Brak dostępnych grup</div>';
-        return;
+    try {
+        const response = await fetch(`/api/episodes/${currentEpisodeId}/media/files`);
+        availableMediaFiles = await response.json();
+        renderMediaFiles();
+    } catch (error) {
+        console.error('Błąd ładowania plików:', error);
     }
-    
-    // Grupuj według nazwy - traktuj grupy o tej samej nazwie jako jedną
-    const groupsByName = {};
-    mediaGroups.forEach(group => {
-        if (!groupsByName[group.name]) {
-            groupsByName[group.name] = {
-                name: group.name,
-                ids: [],
-                scenes: []
-            };
-        }
-        groupsByName[group.name].ids.push(group.id);
-        if (group.scene) {
-            groupsByName[group.name].scenes.push(group.scene.name);
-        }
-    });
-    
-    // Renderuj unikalne grupy
-    const uniqueGroups = Object.values(groupsByName);
-    
-    container.innerHTML = uniqueGroups.map(group => {
-        // Deduplikuj sceny
-        const uniqueScenes = [...new Set(group.scenes)];
-        const sceneLabel = uniqueScenes.length > 0 ? ` (${uniqueScenes.join(', ')})` : '';
-        const groupIdsStr = group.ids.join(','); // Przechowuj wszystkie ID jako string
-        
-        return `<label style="display: flex; align-items: center; gap: 5px; margin-bottom: 5px; cursor: pointer; padding: 4px; border-radius: 3px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
-            <input type="checkbox" class="media-group-checkbox" value="${groupIdsStr}" style="cursor: pointer;">
-            <span style="font-size: 11px;">${group.name}<span style="color: #888; font-size: 9px;">${sceneLabel}</span></span>
-        </label>`;
-    }).join('');
 }
 
 async function loadMediaFiles() {
@@ -1057,142 +1019,412 @@ function renderMediaFiles() {
     }).join('');
 }
 
+// function selectMediaFile(path, name, duration) {
+//     document.getElementById('mediaFilePath').value = path;
+//     document.getElementById('mediaFileDuration').value = duration || 0;
+//     document.getElementById('mediaFileName').textContent = name;
+//     document.getElementById('mediaTitle').value = name.replace(/\.[^/.]+$/, ''); // Remove extension
+//     updateMediaGroupSelect(); // Wypełnij select grup mediów
+//     openAssignMediaModal();
+// }
+
 function selectMediaFile(path, name, duration) {
+    // Ustaw dane pliku
     document.getElementById('mediaFilePath').value = path;
     document.getElementById('mediaFileDuration').value = duration || 0;
     document.getElementById('mediaFileName').textContent = name;
-    document.getElementById('mediaTitle').value = name.replace(/\.[^/.]+$/, ''); // Remove extension
-    updateMediaGroupSelect(); // Wypełnij select grup mediów
-    openAssignMediaModal();
-}
-
-function openAssignMediaModal() {
-    document.getElementById('sceneMedia').checked = false;
-    document.getElementById('sceneReportaze').checked = false;
-    document.getElementById('sceneError').style.display = 'none';
+    document.getElementById('mediaTitle').value = name.replace(/\.[^/.]+$/, ''); // Usuń rozszerzenie
+    
+    // Wyczyść tryb edycji (jeśli był aktywny)
+    const modal = document.getElementById('assignMediaModal');
+    delete modal.dataset.editMode;
+    delete modal.dataset.editMediaId;
+    
+    // Załaduj grupy do select
+    loadGroupsToSelect();
+    
+    // Otwórz modal
     document.getElementById('assignMediaModal').classList.add('active');
 }
 
+function loadGroupsToSelect() {
+    const groupsSelect = document.getElementById('mediaGroupsSelect');
+    if (!groupsSelect) {
+        console.error('Element mediaGroupsSelect nie istnieje!');
+        return;
+    }
+    
+    groupsSelect.innerHTML = '';
+    
+    if (!mediaGroups || mediaGroups.length === 0) {
+        groupsSelect.innerHTML = '<option value="" disabled>Brak dostępnych grup</option>';
+        return;
+    }
+    
+    // Rozdziel na systemowe i użytkownika
+    const systemGroups = mediaGroups.filter(g => g.is_system);
+    const userGroups = mediaGroups.filter(g => !g.is_system);
+    
+    // Dodaj grupy systemowe
+    if (systemGroups.length > 0) {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = 'Grupy systemowe';
+        systemGroups.forEach(group => {
+            const option = document.createElement('option');
+            option.value = group.id;
+            option.textContent = group.name;
+            optgroup.appendChild(option);
+        });
+        groupsSelect.appendChild(optgroup);
+    }
+    
+    // Dodaj grupy użytkownika
+    if (userGroups.length > 0) {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = 'Grupy użytkownika';
+        userGroups.forEach(group => {
+            const option = document.createElement('option');
+            option.value = group.id;
+            option.textContent = group.name;
+            optgroup.appendChild(option);
+        });
+        groupsSelect.appendChild(optgroup);
+    }
+}
+
+// async function openAssignMediaModal(filePath, duration, fileName) {
+//     document.getElementById('mediaFilePath').value = filePath;
+//     document.getElementById('mediaFileDuration').value = duration || 0;
+//     document.getElementById('mediaFileName').textContent = fileName || filePath;
+//     document.getElementById('mediaTitle').value = fileName ? fileName.replace(/\.[^/.]+$/, '') : '';
+//     document.getElementById('mediaDescription').value = '';
+    
+//     // Załaduj listę Staff (autorów)
+//     const staffSelect = document.getElementById('mediaStaff');
+//     staffSelect.innerHTML = '<option value="">Brak</option>';
+    
+//     if (assignedStaff && assignedStaff.length > 0) {
+//         assignedStaff.forEach(assignment => {
+//             if (assignment.staff) {
+//                 const option = document.createElement('option');
+//                 option.value = assignment.id;
+//                 option.textContent = `${assignment.staff.first_name} ${assignment.staff.last_name}`;
+//                 staffSelect.appendChild(option);
+//             }
+//         });
+//     }
+    
+//     // Załaduj grupy do select multiple
+//     const groupsSelect = document.getElementById('mediaGroupsSelect');
+//     groupsSelect.innerHTML = '';
+    
+//     if (mediaGroups && mediaGroups.length > 0) {
+//         // Najpierw grupy systemowe
+//         const systemGroups = mediaGroups.filter(g => g.is_system);
+//         const userGroups = mediaGroups.filter(g => !g.is_system);
+        
+//         if (systemGroups.length > 0) {
+//             const optgroup = document.createElement('optgroup');
+//             optgroup.label = 'Grupy systemowe';
+//             systemGroups.forEach(group => {
+//                 const option = document.createElement('option');
+//                 option.value = group.id;
+//                 option.textContent = group.name;
+//                 optgroup.appendChild(option);
+//             });
+//             groupsSelect.appendChild(optgroup);
+//         }
+        
+//         if (userGroups.length > 0) {
+//             const optgroup = document.createElement('optgroup');
+//             optgroup.label = 'Grupy użytkownika';
+//             userGroups.forEach(group => {
+//                 const option = document.createElement('option');
+//                 option.value = group.id;
+//                 option.textContent = group.name;
+//                 optgroup.appendChild(option);
+//             });
+//             groupsSelect.appendChild(optgroup);
+//         }
+//     }
+    
+//     document.getElementById('assignMediaModal').classList.add('active');
+// }
+
+function openAssignMediaModal(filePath, duration, fileName) {
+    // Jeśli przekazano parametry, wypełnij formularz
+    if (filePath) {
+        document.getElementById('mediaFilePath').value = filePath;
+        document.getElementById('mediaFileDuration').value = duration || 0;
+        document.getElementById('mediaFileName').textContent = fileName || filePath;
+        document.getElementById('mediaTitle').value = fileName ? fileName.replace(/\.[^/.]+$/, '') : '';
+    }
+    
+    document.getElementById('mediaDescription').value = '';
+    
+    // Załaduj listę Staff (autorów)
+    const staffSelect = document.getElementById('mediaStaff');
+    staffSelect.innerHTML = '<option value="">Brak</option>';
+    
+    if (assignedStaff && assignedStaff.length > 0) {
+        assignedStaff.forEach(assignment => {
+            if (assignment.staff) {
+                const option = document.createElement('option');
+                option.value = assignment.id;
+                option.textContent = `${assignment.staff.first_name} ${assignment.staff.last_name}`;
+                staffSelect.appendChild(option);
+            }
+        });
+    }
+    
+    // Wyczyść tryb edycji
+    const modal = document.getElementById('assignMediaModal');
+    delete modal.dataset.editMode;
+    delete modal.dataset.editMediaId;
+    
+    // Załaduj grupy
+    loadGroupsToSelect();
+    
+    // Otwórz modal
+    // document.getElementById('assignMediaModal').style.display = 'flex';
+    // LUB jeśli używasz classList:
+    document.getElementById('assignMediaModal').classList.add('active');
+}
+
+// function closeAssignMediaModal() {
+//     document.getElementById('assignMediaModal').classList.remove('active');
+//     document.getElementById('assignMediaForm').reset();
+// }
+
+// function closeAssignMediaModal() {
+//     const modal = document.getElementById('assignMediaModal');
+//     modal.classList.remove('active');
+    
+//     // Wyczyść tryb edycji
+//     delete modal.dataset.editMode;
+//     delete modal.dataset.editMediaId;
+    
+//     document.getElementById('assignMediaForm').reset();
+// }
+
 function closeAssignMediaModal() {
-    document.getElementById('assignMediaModal').classList.remove('active');
+    const modal = document.getElementById('assignMediaModal');
+    modal.style.display = 'none';
+    // LUB jeśli używasz classList:
+    // modal.classList.remove('active');
+    
+    // Wyczyść tryb edycji
+    delete modal.dataset.editMode;
+    delete modal.dataset.editMediaId;
+    
+    // Resetuj formularz
     document.getElementById('assignMediaForm').reset();
 }
 
-async function assignMedia() {
-    if (!currentEpisodeId) {
-        alert('Najpierw zapisz odcinek');
-        return;
-    }
-
-    // Walidacja scen
-    const mediaChecked = document.getElementById('sceneMedia').checked;
-    const reportazeChecked = document.getElementById('sceneReportaze').checked;
+// async function assignMedia() {
+//     const filePath = document.getElementById('mediaFilePath').value;
+//     const duration = parseInt(document.getElementById('mediaFileDuration').value) || 0;
+//     const title = document.getElementById('mediaTitle').value;
+//     const description = document.getElementById('mediaDescription').value;
+//     const staffId = document.getElementById('mediaStaff').value;
     
-    if (!mediaChecked && !reportazeChecked) {
-        document.getElementById('sceneError').style.display = 'block';
-        return;
-    }
+//     // Pobierz wybrane grupy z select multiple
+//     const groupsSelect = document.getElementById('mediaGroupsSelect');
+//     const selectedGroupIds = Array.from(groupsSelect.selectedOptions).map(opt => parseInt(opt.value));
+    
+//     if (selectedGroupIds.length === 0) {
+//         alert('Wybierz przynajmniej jedną grupę!');
+//         return;
+//     }
+    
+//     try {
+//         // 1. Utwórz media (bez scene_id)
+//         const mediaData = {
+//             title: title,
+//             description: description,
+//             file_path: filePath,
+//             duration: duration,
+//             episode_staff_id: staffId ? parseInt(staffId) : null
+//         };
+        
+//         const mediaResponse = await fetch(`/api/episodes/${currentEpisodeId}/media`, {
+//             method: 'POST',
+//             headers: { 'Content-Type': 'application/json' },
+//             body: JSON.stringify(mediaData)
+//         });
+        
+//         if (!mediaResponse.ok) {
+//             const error = await mediaResponse.text();
+//             throw new Error(error);
+//         }
+        
+//         const createdMedia = await mediaResponse.json();
+        
+//         // 2. Przypisz media do wybranych grup
+//         for (const groupId of selectedGroupIds) {
+//             const assignmentResponse = await fetch(`/api/media-groups/${groupId}/items`, {
+//                 method: 'POST',
+//                 headers: { 'Content-Type': 'application/json' },
+//                 body: JSON.stringify({
+//                     episode_media_id: createdMedia.id
+//                 })
+//             });
+            
+//             if (!assignmentResponse.ok) {
+//                 console.error(`Nie udało się przypisać do grupy ${groupId}`);
+//             }
+//         }
+        
+//         closeAssignMediaModal();
+//         await loadEpisodeDetails(currentEpisodeId);
+//         switchMediaSubTab('assigned');
+//         alert('Media przypisane pomyślnie!');
+        
+//     } catch (error) {
+//         console.error('Błąd przypisywania media:', error);
+//         alert('Błąd: ' + error.message);
+//     }
+// }
+
+// Zaktualizowana funkcja assignMedia aby obsługiwała edycję
+async function assignMedia() {
+    const modal = document.getElementById('assignMediaModal');
+    const editMode = modal.dataset.editMode === 'true';
+    const editMediaId = editMode ? parseInt(modal.dataset.editMediaId) : null;
     
     const filePath = document.getElementById('mediaFilePath').value;
+    const duration = parseInt(document.getElementById('mediaFileDuration').value) || 0;
+    const title = document.getElementById('mediaTitle').value;
+    const description = document.getElementById('mediaDescription').value;
     const staffId = document.getElementById('mediaStaff').value;
     
-    // Zbierz zaznaczone grupy - wartość może być pojedynczym ID lub listą ID oddzieloną przecinkami
-    const selectedGroupIds = Array.from(document.querySelectorAll('.media-group-checkbox:checked'))
-        .flatMap(cb => {
-            // Wartość może być "123" lub "123,456"
-            return cb.value.split(',').map(id => parseInt(id.trim()));
-        })
-        .filter(id => !isNaN(id)); // Usuń nieprawidłowe wartości
+    // Pobierz wybrane grupy
+    const groupsSelect = document.getElementById('mediaGroupsSelect');
+    const selectedGroupIds = Array.from(groupsSelect.selectedOptions).map(opt => parseInt(opt.value));
     
-    const modal = document.getElementById('assignMediaModal');
-    const isEditMode = modal.dataset.editMode === 'true';
-    const originalFilePath = modal.dataset.originalFilePath;
+    if (selectedGroupIds.length === 0) {
+        alert('Wybierz przynajmniej jedną grupę!');
+        return;
+    }
     
-    const baseData = {
-        title: document.getElementById('mediaTitle').value,
-        description: document.getElementById('mediaDescription').value,
-        file_path: filePath,
-        duration: parseInt(document.getElementById('mediaFileDuration').value),
-        episode_staff_id: staffId ? parseInt(staffId) : null,
-        order: 0
-    };
-
     try {
-        if (isEditMode) {
-            // Edycja - usuń stare wpisy, dodaj nowe
-            const oldMediaItems = assignedMedia.filter(m => m.file_path === originalFilePath);
+        if (editMode && editMediaId) {
+            // EDYCJA ISTNIEJĄCEGO MEDIA
             
-            for (const item of oldMediaItems) {
-                await fetch(`/api/episodes/${currentEpisodeId}/media/${item.id}`, {
+            // 1. Zaktualizuj podstawowe dane media
+            const updateData = {
+                title: title,
+                description: description,
+                episode_staff_id: staffId ? parseInt(staffId) : null
+            };
+            
+            const updateResponse = await fetch(`/api/episodes/${currentEpisodeId}/media/${editMediaId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            });
+            
+            if (!updateResponse.ok) {
+                const error = await updateResponse.text();
+                throw new Error(error);
+            }
+            
+            // 2. Pobierz aktualne przypisania do grup
+            const currentMedia = assignedMedia.find(m => m.id === editMediaId);
+            const currentGroupIds = currentMedia && currentMedia.media_groups 
+                ? currentMedia.media_groups.map(mg => mg.media_group_id) 
+                : [];
+            
+            // 3. Usuń z grup które nie są już wybrane
+            const groupsToRemove = currentGroupIds.filter(id => !selectedGroupIds.includes(id));
+            for (const groupId of groupsToRemove) {
+                await fetch(`/api/media-groups/${groupId}/media/${editMediaId}`, {
                     method: 'DELETE'
                 });
             }
-        }
-        
-        const selectedScenes = [];
-        if (mediaChecked) selectedScenes.push({name: 'MEDIA', id: mediaSceneId});
-        if (reportazeChecked) selectedScenes.push({name: 'REPORTAZE', id: reportazeSceneId});
-        
-        const createdMediaIds = []; // Zbieramy ID utworzonych mediów
-        
-        // Utwórz wpis dla każdej wybranej sceny
-        for (const scene of selectedScenes) {
-            const data = { ...baseData, scene_id: scene.id };
             
-            const response = await fetch(`/api/episodes/${currentEpisodeId}/media`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
-
-            if (response.ok) {
-                const newMedia = await response.json();
-                createdMediaIds.push(newMedia.id);
-            } else if (response.status === 409) {
-                alert(`Ten plik jest już przypisany do sceny ${scene.name} w tym odcinku`);
-                return;
-            } else {
-                const error = await response.text();
-                alert('Błąd przypisywania media: ' + error);
-                return;
-            }
-        }
-        
-        // Dodaj wszystkie utworzone media do wybranych grup (tylko raz)
-        if (selectedGroupIds.length > 0 && createdMediaIds.length > 0) {
-            for (const groupId of selectedGroupIds) {
-                for (const mediaId of createdMediaIds) {
-                    try {
-                        const response = await fetch(`/api/media-groups/${groupId}/items`, {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                episode_media_id: mediaId,
-                                order: 0
-                            })
-                        });
-                        
-                        // Ignoruj błąd 409 (Conflict) - media już jest w grupie
-                        if (!response.ok && response.status !== 409) {
-                            console.error('Błąd dodawania do grupy:', await response.text());
-                        }
-                    } catch (error) {
-                        console.error('Błąd dodawania do grupy:', error);
-                    }
+            // 4. Dodaj do nowych grup
+            const groupsToAdd = selectedGroupIds.filter(id => !currentGroupIds.includes(id));
+            for (const groupId of groupsToAdd) {
+                const assignmentResponse = await fetch(`/api/media-groups/${groupId}/items`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        episode_media_id: editMediaId
+                    })
+                });
+                
+                if (!assignmentResponse.ok && assignmentResponse.status !== 409) {
+                    // 409 = już istnieje, ignoruj ten błąd
+                    console.error(`Nie udało się przypisać do grupy ${groupId}`);
                 }
             }
+            
+            alert('Media zaktualizowane pomyślnie!');
+            
+        } else {
+            // TWORZENIE NOWEGO MEDIA
+            
+            // 1. Utwórz media
+            const mediaData = {
+                title: title,
+                description: description,
+                file_path: filePath,
+                duration: duration,
+                episode_staff_id: staffId ? parseInt(staffId) : null
+            };
+            
+            const mediaResponse = await fetch(`/api/episodes/${currentEpisodeId}/media`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(mediaData)
+            });
+            
+            if (!mediaResponse.ok) {
+                const error = await mediaResponse.text();
+                throw new Error(error);
+            }
+            
+            const createdMedia = await mediaResponse.json();
+            
+            // 2. Przypisz do wybranych grup
+            for (const groupId of selectedGroupIds) {
+                const assignmentResponse = await fetch(`/api/media-groups/${groupId}/items`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        episode_media_id: createdMedia.id
+                    })
+                });
+                
+                if (!assignmentResponse.ok && assignmentResponse.status !== 409) {
+                    console.error(`Nie udało się przypisać do grupy ${groupId}`);
+                }
+            }
+            
+            alert('Media przypisane pomyślnie!');
         }
         
         // Wyczyść tryb edycji
         delete modal.dataset.editMode;
-        delete modal.dataset.originalFilePath;
+        delete modal.dataset.editMediaId;
         
         closeAssignMediaModal();
-        await loadAssignedMedia();
-        await loadMediaFiles(); // Odśwież listę plików
+        // await loadEpisodeDetails(currentEpisodeId);
+        // ----->
+        await Promise.all([
+            loadAssignedMedia(),
+            loadMediaGroups()
+        ]);
+        renderAssignedMedia();
+        renderMediaGroups();
+        await loadMediaFiles();
+        // <-----
+        switchMediaSubTab('assigned');
+        
     } catch (error) {
-        console.error('Błąd:', error);
-        alert('Błąd połączenia');
+        console.error('Błąd zapisywania media:', error);
+        alert('Błąd: ' + error.message);
     }
 }
 
@@ -1209,149 +1441,253 @@ async function loadAssignedMedia() {
 }
 
 function renderAssignedMedia() {
-    const containerMedia = document.getElementById('assignedMediaListMedia');
-    const containerReportaze = document.getElementById('assignedMediaListReportaze');
+    const container = document.getElementById('assignedMediaList');
     
     if (assignedMedia.length === 0) {
-        containerMedia.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak mediów MEDIA</div>';
-        containerReportaze.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak mediów REPORTAŻE</div>';
+        container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak przypisanych mediów</div>';
         return;
     }
 
-    // Grupuj media po file_path i scenie
-    const mediaByFileAndScene = {};
-    assignedMedia.forEach(m => {
-        const sceneName = m.scene ? m.scene.name : 'UNKNOWN';
-        const key = `${m.file_path}_${sceneName}`;
-        
-        if (!mediaByFileAndScene[key]) {
-            mediaByFileAndScene[key] = {
-                title: m.title,
-                file_path: m.file_path,
-                description: m.description,
-                duration: m.duration,
-                author: m.episode_staff,
-                scene: m.scene,
-                mediaItems: []
-            };
-        }
-        mediaByFileAndScene[key].mediaItems.push(m);
-    });
-    
-    const groupedMedia = Object.values(mediaByFileAndScene);
-    
-    // Rozdziel na MEDIA i REPORTAZE
-    const mediaItems_MEDIA = groupedMedia.filter(m => m.scene?.name === 'MEDIA');
-    const mediaItems_REPORTAZE = groupedMedia.filter(m => m.scene?.name === 'REPORTAZE');
-    
-    // Funkcja renderująca pojedynczy element
-    const renderMediaItem = (media) => {
-        const authorName = media.author && media.author.staff ? 
-            `${media.author.staff.first_name} ${media.author.staff.last_name}` : 
+    // Renderuj wszystkie media w jednej liście
+    const html = assignedMedia.map(media => {
+        const authorName = media.episode_staff && media.episode_staff.staff ? 
+            `${media.episode_staff.staff.first_name} ${media.episode_staff.staff.last_name}` : 
             'Brak';
         
-        // Sprawdź czy któryś z wpisów jest current
-        const hasCurrent = media.mediaItems.some(m => m.is_current);
-        const currentBadge = hasCurrent ? 
-            '<span class="badge badge-success">WCZYTANY</span>' : '';
+        // Wyświetl grupy do których należy media
+        const groupNames = media.media_groups && media.media_groups.length > 0
+            ? media.media_groups.map(mg => mg.media_group.name).join(', ')
+            : 'Brak grup';
         
         return `
-            <div class="assigned-media-item" onclick="editMediaAssignment('${media.file_path}')">
+            <div class="assigned-media-item">
                 <div class="media-item-details">
-                    <div class="media-item-title">${media.title} ${currentBadge}</div>
+                    <div class="media-item-title">${media.title}</div>
                     <div class="media-item-meta">
                         Autor: ${authorName}<br>
+                        Grupy: ${groupNames}<br>
                         ${media.description ? `Opis: ${media.description}<br>` : ''}
                         Plik: ${media.file_path || 'Brak'}<br>
                         ${media.duration ? `Czas: ${formatDuration(media.duration)}<br>` : ''}
                     </div>
                 </div>
                 <div class="list-item-actions" style="pointer-events: auto;">
-                    <button class="btn btn-primary btn-icon" onclick="event.stopPropagation(); editMediaAssignment('${media.file_path}')" title="Edytuj">✎</button>
-                    <button class="btn btn-danger btn-icon" onclick="event.stopPropagation(); removeMediaFile('${media.file_path}')" title="Usuń">×</button>
+                    <button class="btn btn-primary btn-icon" onclick="editMediaAssignment(${media.id})" title="Edytuj">✎</button>
+                    <button class="btn btn-danger btn-icon" onclick="removeMedia(${media.id})" title="Usuń">×</button>
                 </div>
             </div>
         `;
-    };
+    }).join('');
     
-    // Renderuj MEDIA
-    if (mediaItems_MEDIA.length === 0) {
-        containerMedia.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak mediów MEDIA</div>';
-    } else {
-        containerMedia.innerHTML = mediaItems_MEDIA.map(renderMediaItem).join('');
-    }
-    
-    // Renderuj REPORTAZE
-    if (mediaItems_REPORTAZE.length === 0) {
-        containerReportaze.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak mediów REPORTAŻE</div>';
-    } else {
-        containerReportaze.innerHTML = mediaItems_REPORTAZE.map(renderMediaItem).join('');
-    }
+    container.innerHTML = html;
 }
-//            </div>
-//       `;
-//    }).join('');
-//}
 
-function editMediaAssignment(filePath) {
-    // Znajdź wszystkie media z tym plikiem
-    const mediaItems = assignedMedia.filter(m => m.file_path === filePath);
-    if (mediaItems.length === 0) return;
-
-    const first = mediaItems[0];
+function editMediaAssignment(mediaId) {
+    // Znajdź media po ID
+    const media = assignedMedia.find(m => m.id === mediaId);
+    if (!media) {
+        console.error('Nie znaleziono media o ID:', mediaId);
+        return;
+    }
     
     // Wypełnij formularz
-    document.getElementById('mediaFilePath').value = filePath;
-    document.getElementById('mediaFileDuration').value = first.duration || 0;
-    document.getElementById('mediaFileName').textContent = filePath.split('/').pop();
-    document.getElementById('mediaTitle').value = first.title;
-    document.getElementById('mediaDescription').value = first.description || '';
-    document.getElementById('mediaStaff').value = first.episode_staff_id || '';
+    document.getElementById('mediaFilePath').value = media.file_path;
+    document.getElementById('mediaFileDuration').value = media.duration || 0;
+    document.getElementById('mediaFileName').textContent = media.file_path ? media.file_path.split('/').pop() : '';
+    document.getElementById('mediaTitle').value = media.title;
+    document.getElementById('mediaDescription').value = media.description || '';
+    document.getElementById('mediaStaff').value = media.episode_staff_id || '';
     
-    // Zaznacz sceny
-    document.getElementById('sceneMedia').checked = mediaItems.some(m => m.scene?.name === 'MEDIA');
-    document.getElementById('sceneReportaze').checked = mediaItems.some(m => m.scene?.name === 'REPORTAZE');
-    document.getElementById('sceneError').style.display = 'none';
+    // Usuń stare pola scen - nie są już używane
+    // document.getElementById('sceneMedia').checked = ...
+    // document.getElementById('sceneReportaze').checked = ...
     
-    // Zapisz oryginalne file_path jako identyfikator edycji
+    // Zapisz ID media jako tryb edycji
     document.getElementById('assignMediaModal').dataset.editMode = 'true';
-    document.getElementById('assignMediaModal').dataset.originalFilePath = filePath;
+    document.getElementById('assignMediaModal').dataset.editMediaId = mediaId;
     
-    // Najpierw wygeneruj checkboxy grup
-    updateMediaGroupSelect();
+    // Załaduj grupy do select
+    const groupsSelect = document.getElementById('mediaGroupsSelect');
+    groupsSelect.innerHTML = '';
     
-    // Następnie zaznacz grupy, do których należą te media
-    // Pobierz ID wszystkich media dla tego pliku
-    const mediaIds = mediaItems.map(m => m.id);
+    if (mediaGroups && mediaGroups.length > 0) {
+        // Grupy systemowe
+        const systemGroups = mediaGroups.filter(g => g.is_system);
+        const userGroups = mediaGroups.filter(g => !g.is_system);
+        
+        if (systemGroups.length > 0) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = 'Grupy systemowe';
+            systemGroups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = group.name;
+                optgroup.appendChild(option);
+            });
+            groupsSelect.appendChild(optgroup);
+        }
+        
+        if (userGroups.length > 0) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = 'Grupy użytkownika';
+            userGroups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = group.name;
+                optgroup.appendChild(option);
+            });
+            groupsSelect.appendChild(optgroup);
+        }
+    }
     
-    // Przeszukaj wszystkie grupy i zaznacz te, które zawierają którekolwiek z tych media
-    setTimeout(() => {
-        mediaGroups.forEach(group => {
-            // Sprawdź czy grupa zawiera którekolwiek z tych media
-            // (To jest uproszczenie - w pełnej implementacji trzeba by sprawdzić media_group_items)
-            // Na razie zostawiamy niezaznaczone, bo przy edycji nie zachowujemy grup
+    // Zaznacz grupy do których należy media
+    if (media.media_groups && media.media_groups.length > 0) {
+        const mediaGroupIds = media.media_groups.map(mg => mg.media_group_id);
+        
+        // Zaznacz opcje w select
+        Array.from(groupsSelect.options).forEach(option => {
+            if (mediaGroupIds.includes(parseInt(option.value))) {
+                option.selected = true;
+            }
         });
-    }, 100);
+    }
     
     document.getElementById('assignMediaModal').classList.add('active');
 }
 
-async function removeMediaFile(filePath) {
-    if (!confirm('Czy na pewno usunąć to media ze wszystkich scen?')) return;
+// function editMediaAssignment(filePath) {
+//     // Znajdź wszystkie media z tym plikiem
+//     const mediaItems = assignedMedia.filter(m => m.file_path === filePath);
+//     if (mediaItems.length === 0) return;
 
-    try {
-        const mediaItems = assignedMedia.filter(m => m.file_path === filePath);
+//     const first = mediaItems[0];
+    
+//     // Wypełnij formularz
+//     document.getElementById('mediaFilePath').value = filePath;
+//     document.getElementById('mediaFileDuration').value = first.duration || 0;
+//     document.getElementById('mediaFileName').textContent = filePath.split('/').pop();
+//     document.getElementById('mediaTitle').value = first.title;
+//     document.getElementById('mediaDescription').value = first.description || '';
+//     document.getElementById('mediaStaff').value = first.episode_staff_id || '';
+    
+//     // Zaznacz sceny
+//     document.getElementById('sceneMedia').checked = mediaItems.some(m => m.scene?.name === 'MEDIA');
+//     document.getElementById('sceneReportaze').checked = mediaItems.some(m => m.scene?.name === 'REPORTAZE');
+//     document.getElementById('sceneError').style.display = 'none';
+    
+//     // Zapisz oryginalne file_path jako identyfikator edycji
+//     document.getElementById('assignMediaModal').dataset.editMode = 'true';
+//     document.getElementById('assignMediaModal').dataset.originalFilePath = filePath;
+    
+//     // Najpierw wygeneruj checkboxy grup
+//     updateMediaGroupSelect();
+    
+//     // Następnie zaznacz grupy, do których należą te media
+//     // Pobierz ID wszystkich media dla tego pliku
+//     const mediaIds = mediaItems.map(m => m.id);
+    
+//     // Przeszukaj wszystkie grupy i zaznacz te, które zawierają którekolwiek z tych media
+//     setTimeout(() => {
+//         mediaGroups.forEach(group => {
+//             // Sprawdź czy grupa zawiera którekolwiek z tych media
+//             // (To jest uproszczenie - w pełnej implementacji trzeba by sprawdzić media_group_items)
+//             // Na razie zostawiamy niezaznaczone, bo przy edycji nie zachowujemy grup
+//         });
+//     }, 100);
+    
+//     document.getElementById('assignMediaModal').classList.add('active');
+// }
+
+// async function removeMediaFile(filePath) {
+//     if (!confirm('Czy na pewno usunąć to media ze wszystkich scen?')) return;
+
+//     try {
+//         const mediaItems = assignedMedia.filter(m => m.file_path === filePath);
         
-        for (const item of mediaItems) {
-            await fetch(`/api/episodes/${currentEpisodeId}/media/${item.id}`, {
-                method: 'DELETE'
-            });
+//         for (const item of mediaItems) {
+//             await fetch(`/api/episodes/${currentEpisodeId}/media/${item.id}`, {
+//                 method: 'DELETE'
+//             });
+//         }
+        
+//         await loadAssignedMedia();
+//     } catch (error) {
+//         console.error('Błąd:', error);
+//         alert('Błąd usuwania');
+//     }
+// }
+
+async function removeMedia(mediaId) {
+    if (!confirm('Czy na pewno chcesz usunąć to media? Zostanie usunięte ze wszystkich grup.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/episodes/${currentEpisodeId}/media/${mediaId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Nie udało się usunąć media');
         }
         
-        await loadAssignedMedia();
+        // await loadEpisodeDetails(currentEpisodeId);
+        // ----->
+        await Promise.all([
+            loadAssignedMedia(),
+            loadMediaGroups()
+        ]);
+        renderAssignedMedia();
+        renderMediaGroups();
+        await loadMediaFiles();
+        // <-----
+        alert('Media usunięte pomyślnie!');
+        
     } catch (error) {
-        console.error('Błąd:', error);
-        alert('Błąd usuwania');
+        console.error('Błąd usuwania media:', error);
+        alert('Błąd: ' + error.message);
+    }
+}
+
+async function loadGroupMedia(groupId) {
+    try {
+        const response = await fetch(`/api/media-groups/${groupId}/items`);
+        if (!response.ok) {
+            throw new Error('Nie udało się załadować mediów w grupie');
+        }
+        
+        const items = await response.json();
+        const container = document.getElementById('groupMediaList');
+        
+        if (items.length === 0) {
+            container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak mediów w grupie</div>';
+            return;
+        }
+        
+        const html = items.map(item => {
+            const media = item.episode_media;
+            return `
+                <div class="group-media-item">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 500; font-size: 12px;">${media.title}</div>
+                        <div style="font-size: 10px; color: #888;">
+                            ${media.file_path || 'Brak pliku'}
+                            ${media.duration ? ` • ${formatDuration(media.duration)}` : ''}
+                        </div>
+                    </div>
+                    <button class="btn btn-danger btn-icon btn-small" 
+                            onclick="removeMediaFromGroup(${groupId}, ${media.id})" 
+                            title="Usuń z grupy">×</button>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Błąd ładowania mediów grupy:', error);
+        document.getElementById('groupMediaList').innerHTML = 
+            '<div style="text-align: center; padding: 20px; color: #f00; font-size: 11px;">Błąd ładowania</div>';
     }
 }
 
@@ -1395,61 +1731,50 @@ async function loadMediaGroups() {
 }
 
 function renderMediaGroups() {
-    const containerMedia = document.getElementById('mediaGroupsListMedia');
-    const containerReportaze = document.getElementById('mediaGroupsListReportaze');
+    const systemContainer = document.getElementById('systemGroupsList');
+    const userContainer = document.getElementById('userGroupsList');
     
     if (mediaGroups.length === 0) {
-        containerMedia.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak grup MEDIA</div>';
-        containerReportaze.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak grup REPORTAŻE</div>';
+        systemContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Ładowanie...</div>';
+        userContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak grup użytkownika</div>';
         return;
     }
-
-    // Rozdziel grupy według scen
-    const mediaGroups_MEDIA = mediaGroups.filter(g => g.scene && g.scene.name === 'MEDIA');
-    const mediaGroups_REPORTAZE = mediaGroups.filter(g => g.scene && g.scene.name === 'REPORTAZE');
-
-    // Renderuj grupy MEDIA
-    if (mediaGroups_MEDIA.length === 0) {
-        containerMedia.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak grup MEDIA</div>';
-    } else {
-        containerMedia.innerHTML = mediaGroups_MEDIA.map(group => {
-            const isActive = group.is_current || false;
-            const activeClass = isActive ? 'active' : '';
-            
-            return `
-                <div class="media-group-card ${activeClass}" data-group-id="${group.id}" onclick="openManageMediaGroupModal(${group.id})">
-                    <div class="media-group-header">
-                        <div>
-                            <div class="media-group-name">${group.name}</div>
-                            <div class="media-group-count">${group.description || 'Brak opisu'}</div>
-                        </div>
-                        ${isActive ? '<span class="badge badge-success">AKTYWNA</span>' : ''}
+    
+    // Rozdziel na systemowe i użytkownika
+    const systemGroups = mediaGroups.filter(g => g.is_system);
+    const userGroups = mediaGroups.filter(g => !g.is_system);
+    
+    // Funkcja renderująca pojedynczą grupę
+    const renderGroup = (group, isSystem) => {
+        const icon = group.name === 'MEDIA' ? '📺' : 
+                     group.name === 'REPORTAZE' ? '🎬' : '📁';
+        
+        return `
+            <div class="media-group-item" onclick="openManageMediaGroupModal(${group.id})">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 18px;">${icon}</span>
+                    <div>
+                        <div style="font-weight: 500; font-size: 13px;">${group.name}</div>
+                        ${group.description ? `<div style="font-size: 10px; color: #888;">${group.description}</div>` : ''}
                     </div>
                 </div>
-            `;
-        }).join('');
+                ${isSystem ? '<span class="badge" style="background: #555;">Systemowa</span>' : ''}
+            </div>
+        `;
+    };
+    
+    // Renderuj grupy systemowe
+    if (systemGroups.length === 0) {
+        systemContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak grup systemowych</div>';
+    } else {
+        systemContainer.innerHTML = systemGroups.map(g => renderGroup(g, true)).join('');
     }
-
-    // Renderuj grupy REPORTAZE
-    if (mediaGroups_REPORTAZE.length === 0) {
-        containerReportaze.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak grup REPORTAŻE</div>';
+    
+    // Renderuj grupy użytkownika
+    if (userGroups.length === 0) {
+        userContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak grup użytkownika</div>';
     } else {
-        containerReportaze.innerHTML = mediaGroups_REPORTAZE.map(group => {
-            const isActive = group.is_current || false;
-            const activeClass = isActive ? 'active' : '';
-            
-            return `
-                <div class="media-group-card ${activeClass}" data-group-id="${group.id}" onclick="openManageMediaGroupModal(${group.id})">
-                    <div class="media-group-header">
-                        <div>
-                            <div class="media-group-name">${group.name}</div>
-                            <div class="media-group-count">${group.description || 'Brak opisu'}</div>
-                        </div>
-                        ${isActive ? '<span class="badge badge-success">AKTYWNA</span>' : ''}
-                    </div>
-                </div>
-            `;
-        }).join('');
+        userContainer.innerHTML = userGroups.map(g => renderGroup(g, false)).join('');
     }
 }
 
@@ -1466,81 +1791,114 @@ function closeAddMediaGroupModal() {
 }
 
 async function createMediaGroup() {
-    if (!currentEpisodeId) {
-        alert('Najpierw zapisz odcinek');
-        return;
-    }
-
-    // Walidacja scen
-    const mediaChecked = document.getElementById('groupSceneMedia').checked;
-    const reportazeChecked = document.getElementById('groupSceneReportaze').checked;
+    const name = document.getElementById('groupName').value;
+    const description = document.getElementById('groupDescription').value;
     
-    if (!mediaChecked && !reportazeChecked) {
-        document.getElementById('groupSceneError').style.display = 'block';
-        return;
-    }
-
-    // Utwórz grupę dla każdej wybranej sceny
+    // USUŃ: checkboxy scen, nie wysyłaj scene_id
+    
     try {
-        const selectedScenes = [];
-        if (mediaChecked) selectedScenes.push({name: 'MEDIA', id: mediaSceneId});
-        if (reportazeChecked) selectedScenes.push({name: 'REPORTAZE', id: reportazeSceneId});
-        
-        for (const scene of selectedScenes) {
-            const data = {
+        const response = await fetch('/api/media-groups', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
                 episode_id: currentEpisodeId,
-                scene_id: scene.id,
-                name: document.getElementById('mediaGroupName').value + (selectedScenes.length > 1 ? ` (${scene.name})` : ''),
-                description: document.getElementById('mediaGroupDescription').value
-            };
-            
-            const response = await fetch('/api/media-groups', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
-
-            if (!response.ok) {
-                const error = await response.text();
-                alert('Błąd dodawania grupy: ' + error);
-                return;
-            }
+                name: name,
+                description: description
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(error);
         }
         
         closeAddMediaGroupModal();
-        await loadMediaGroups();
+        // await loadEpisodeDetails(currentEpisodeId);
+        // ----->
+        await Promise.all([
+            loadAssignedMedia(),
+            loadMediaGroups()
+        ]);
+        renderAssignedMedia();
+        renderMediaGroups();
+        await loadMediaFiles();
+        // <-----
+        switchMediaSubTab('groups');
+        alert('Grupa utworzona pomyślnie!');
+        
     } catch (error) {
-        console.error('Błąd:', error);
-        alert('Błąd połączenia');
+        console.error('Błąd tworzenia grupy:', error);
+        alert('Błąd: ' + error.message);
     }
 }
 
 async function openManageMediaGroupModal(groupId) {
     currentMediaGroup = mediaGroups.find(g => g.id === groupId);
     if (!currentMediaGroup) return;
-
-    document.getElementById('currentMediaGroupId').value = groupId;
-    document.getElementById('manageMediaGroupTitle').textContent = currentMediaGroup.name;
-    document.getElementById('mediaGroupInfo').textContent = currentMediaGroup.description || 'Brak opisu';
-
-    // Sprawdź czy istnieją grupy o tej samej nazwie w innych scenach
-    const sceneName = currentMediaGroup.scene ? currentMediaGroup.scene.name : '';
-    const sameNameGroups = mediaGroups.filter(g => 
-        g.name === currentMediaGroup.name && 
-        g.episode_id === currentMediaGroup.episode_id
-    );
     
-    // Zaznacz checkboxy dla wszystkich scen gdzie istnieje ta grupa
-    let hasMedia = sameNameGroups.some(g => g.scene?.name === 'MEDIA');
-    let hasReportaze = sameNameGroups.some(g => g.scene?.name === 'REPORTAZE');
+    document.getElementById('manageGroupId').value = groupId;
+    document.getElementById('manageGroupTitle').textContent = `Zarządzanie Grupą: ${currentMediaGroup.name}`;
+    document.getElementById('manageGroupName').value = currentMediaGroup.name;
+    document.getElementById('manageGroupDescription').value = currentMediaGroup.description || '';
     
-    document.getElementById('manageGroupSceneMedia').checked = hasMedia;
-    document.getElementById('manageGroupSceneReportaze').checked = hasReportaze;
-
+    // Ukryj przycisk Usuń dla grup systemowych
+    const deleteBtn = document.getElementById('deleteGroupBtn');
+    if (currentMediaGroup.is_system) {
+        deleteBtn.style.display = 'none';
+        // Zablokuj edycję nazwy dla grup systemowych
+        document.getElementById('manageGroupName').disabled = true;
+    } else {
+        deleteBtn.style.display = 'inline-block';
+        document.getElementById('manageGroupName').disabled = false;
+    }
+    
+    // USUŃ: aktualizację checkboxów scen
+    
     // Załaduj media w grupie
-    await loadGroupMediaItems(groupId);
-
+    await loadGroupMedia(groupId);
+    
     document.getElementById('manageMediaGroupModal').classList.add('active');
+}
+
+async function updateMediaGroup() {
+    const groupId = document.getElementById('manageGroupId').value;
+    const name = document.getElementById('manageGroupName').value;
+    const description = document.getElementById('manageGroupDescription').value;
+    
+    // USUŃ: pobieranie i wysyłanie scen
+    
+    try {
+        const response = await fetch(`/api/media-groups/${groupId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: name,
+                description: description
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(error);
+        }
+        
+        closeManageMediaGroupModal();
+        // await loadEpisodeDetails(currentEpisodeId);
+        // ----->
+        await Promise.all([
+            loadAssignedMedia(),
+            loadMediaGroups()
+        ]);
+        renderAssignedMedia();
+        renderMediaGroups();
+        await loadMediaFiles();
+        // <-----
+        alert('Grupa zaktualizowana pomyślnie!');
+        
+    } catch (error) {
+        console.error('Błąd aktualizacji grupy:', error);
+        alert('Błąd: ' + error.message);
+    }
 }
 
 function closeManageMediaGroupModal() {

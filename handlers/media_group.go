@@ -21,7 +21,7 @@ func NewMediaGroupHandler(db *gorm.DB) *MediaGroupHandler {
 // GetMediaGroups - GET /api/media-groups
 func (h *MediaGroupHandler) GetMediaGroups(w http.ResponseWriter, r *http.Request) {
 	var groups []models.MediaGroup
-	query := h.DB.Preload("Scene").Order("\"order\" ASC")
+	query := h.DB.Order("\"order\" ASC")
 
 	// Filtruj po episode_id jeśli podano
 	if episodeID := r.URL.Query().Get("episode_id"); episodeID != "" {
@@ -49,7 +49,7 @@ func (h *MediaGroupHandler) GetMediaGroup(w http.ResponseWriter, r *http.Request
 	}
 
 	var group models.MediaGroup
-	result := h.DB.First(&group, id)
+	result := h.DB.Preload("Episode").First(&group, id)
 
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
@@ -71,6 +71,9 @@ func (h *MediaGroupHandler) CreateMediaGroup(w http.ResponseWriter, r *http.Requ
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// Nie pozwalaj tworzyć grup systemowych przez API
+	group.IsSystem = false
 
 	// Automatycznie ustaw kolejność jeśli nie podano
 	if group.Order == 0 {
@@ -106,6 +109,12 @@ func (h *MediaGroupHandler) UpdateMediaGroup(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Nie pozwalaj edytować flag systemowej
+	if group.IsSystem {
+		http.Error(w, "Cannot edit system group", http.StatusForbidden)
+		return
+	}
+
 	var updateData models.MediaGroup
 	if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -114,7 +123,6 @@ func (h *MediaGroupHandler) UpdateMediaGroup(w http.ResponseWriter, r *http.Requ
 
 	group.Name = updateData.Name
 	group.Description = updateData.Description
-	group.SceneID = updateData.SceneID
 
 	if err := h.DB.Save(&group).Error; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -134,10 +142,26 @@ func (h *MediaGroupHandler) DeleteMediaGroup(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	var group models.MediaGroup
+	if err := h.DB.First(&group, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			http.Error(w, "Media group not found", http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Nie pozwalaj usuwać grup systemowych
+	if group.IsSystem {
+		http.Error(w, "Cannot delete system group", http.StatusForbidden)
+		return
+	}
+
 	// Usuń najpierw przypisania
 	h.DB.Where("media_group_id = ?", id).Delete(&models.EpisodeMediaGroup{})
 
-	if err := h.DB.Delete(&models.MediaGroup{}, id).Error; err != nil {
+	if err := h.DB.Delete(&group).Error; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -156,8 +180,8 @@ func (h *MediaGroupHandler) GetMediaGroupItems(w http.ResponseWriter, r *http.Re
 	}
 
 	var items []models.EpisodeMediaGroup
-	result := h.DB.Preload("EpisodeMedia.Scene").
-		Preload("EpisodeMedia.EpisodeStaff.Staff").
+	result := h.DB.Preload("EpisodeMedia.EpisodeStaff.Staff").
+		Preload("CurrentScene").
 		Where("media_group_id = ?", id).
 		Order("\"order\" ASC").
 		Find(&items)
@@ -204,7 +228,7 @@ func (h *MediaGroupHandler) AddItemToGroup(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Sprawdź czy już nie jest przypisane
+	// Sprawdź czy już nie jest przypisane (zapobieganie duplikatom)
 	var existing models.EpisodeMediaGroup
 	if err := h.DB.Where("episode_media_id = ? AND media_group_id = ?", data.EpisodeMediaID, groupID).First(&existing).Error; err == nil {
 		http.Error(w, "Media already in group", http.StatusConflict)
@@ -221,7 +245,7 @@ func (h *MediaGroupHandler) AddItemToGroup(w http.ResponseWriter, r *http.Reques
 		EpisodeMediaID: data.EpisodeMediaID,
 		MediaGroupID:   uint(groupID),
 		Order:          order,
-		IsCurrent:      false,
+		CurrentInScene: nil, // Domyślnie nieaktywny
 	}
 
 	if err := h.DB.Create(&assignment).Error; err != nil {
@@ -230,14 +254,13 @@ func (h *MediaGroupHandler) AddItemToGroup(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Załaduj relacje
-	h.DB.Preload("EpisodeMedia").Preload("MediaGroup").First(&assignment, assignment.ID)
+	h.DB.Preload("EpisodeMedia").Preload("MediaGroup").Preload("CurrentScene").First(&assignment, assignment.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(assignment)
 }
 
-// AddMediaToGroup - POST /api/media-groups/{group_id}/media/{media_id}
 // RemoveMediaFromGroup - DELETE /api/media-groups/{group_id}/media/{media_id}
 func (h *MediaGroupHandler) RemoveMediaFromGroup(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -271,28 +294,100 @@ func (h *MediaGroupHandler) RemoveMediaFromGroup(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// SetCurrentMediaGroup - POST /api/episodes/{episode_id}/media-groups/{group_id}/set-current
-func (h *MediaGroupHandler) SetCurrentMediaGroup(w http.ResponseWriter, r *http.Request) {
+// SetCurrentMediaInGroup - POST /api/media-groups/{group_id}/media/{media_id}/set-current
+// Ustawia media jako aktywne w danej scenie (wymaga scene_id w body)
+func (h *MediaGroupHandler) SetCurrentMediaInGroup(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
-		return
-	}
-
 	groupID, err := strconv.ParseUint(vars["group_id"], 10, 32)
 	if err != nil {
 		http.Error(w, "Invalid group ID", http.StatusBadRequest)
 		return
 	}
 
-	if err := models.SetCurrentMediaGroup(h.DB, uint(episodeID), uint(groupID)); err != nil {
+	mediaID, err := strconv.ParseUint(vars["media_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid media ID", http.StatusBadRequest)
+		return
+	}
+
+	var data struct {
+		SceneID uint `json:"scene_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := models.SetCurrentMediaInGroup(h.DB, uint(groupID), uint(mediaID), data.SceneID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// ClearCurrentMediaInGroup - POST /api/media-groups/{group_id}/clear-current
+// Wyłącza aktywne media w grupie dla danej sceny (wymaga scene_id w body)
+func (h *MediaGroupHandler) ClearCurrentMediaInGroup(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	groupID, err := strconv.ParseUint(vars["group_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid group ID", http.StatusBadRequest)
+		return
+	}
+
+	var data struct {
+		SceneID uint `json:"scene_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := models.ClearCurrentMediaInGroup(h.DB, uint(groupID), data.SceneID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// GetCurrentMediaInGroup - GET /api/media-groups/{group_id}/current?scene_id={scene_id}
+// Pobiera aktywne media w grupie dla danej sceny
+func (h *MediaGroupHandler) GetCurrentMediaInGroup(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	groupID, err := strconv.ParseUint(vars["group_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid group ID", http.StatusBadRequest)
+		return
+	}
+
+	sceneIDStr := r.URL.Query().Get("scene_id")
+	if sceneIDStr == "" {
+		http.Error(w, "scene_id parameter required", http.StatusBadRequest)
+		return
+	}
+
+	sceneID, err := strconv.ParseUint(sceneIDStr, 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid scene_id", http.StatusBadRequest)
+		return
+	}
+
+	assignment, err := models.GetCurrentMediaInGroup(h.DB, uint(groupID), uint(sceneID))
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			http.Error(w, "No current media in this group for the specified scene", http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(assignment)
 }
 
 // ReorderMediaGroup - PUT /api/media-groups/{id}/reorder
@@ -403,4 +498,100 @@ func (h *MediaGroupHandler) ReorderMediaGroupItem(w http.ResponseWriter, r *http
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// SetCurrentMediaGroup - POST /api/episodes/{episode_id}/media-groups/{group_id}/set-current
+// Ustawia grupę jako aktywną w danej scenie (wymaga scene_id w body: 0 dla obu scen, lub konkretne ID sceny)
+func (h *MediaGroupHandler) SetCurrentMediaGroup(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	groupID, err := strconv.ParseUint(vars["group_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid group ID", http.StatusBadRequest)
+		return
+	}
+
+	var data struct {
+		SceneID uint `json:"scene_id"` // 0 = obie sceny, lub konkretne ID sceny
+	}
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := models.SetCurrentMediaGroup(h.DB, uint(episodeID), uint(groupID), data.SceneID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// ClearCurrentMediaGroupHandler - POST /api/episodes/{episode_id}/media-groups/clear-current
+// Wyłącza aktywną grupę w odcinku dla danej sceny (wymaga scene_id w body)
+func (h *MediaGroupHandler) ClearCurrentMediaGroupHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	var data struct {
+		SceneID uint `json:"scene_id"` // 0 = obie sceny, lub konkretne ID sceny
+	}
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := models.ClearCurrentMediaGroup(h.DB, uint(episodeID), data.SceneID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// GetCurrentMediaGroupHandler - GET /api/episodes/{episode_id}/media-groups/current?scene_id={scene_id}
+// Pobiera aktywną grupę w odcinku dla danej sceny
+func (h *MediaGroupHandler) GetCurrentMediaGroupHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	sceneIDStr := r.URL.Query().Get("scene_id")
+	if sceneIDStr == "" {
+		http.Error(w, "scene_id parameter required", http.StatusBadRequest)
+		return
+	}
+
+	sceneID, err := strconv.ParseUint(sceneIDStr, 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid scene_id", http.StatusBadRequest)
+		return
+	}
+
+	group, err := models.GetCurrentMediaGroup(h.DB, uint(episodeID), uint(sceneID))
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			http.Error(w, "No current group for the specified scene", http.StatusNotFound)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(group)
 }

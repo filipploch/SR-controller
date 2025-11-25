@@ -365,7 +365,7 @@
         <div class="modal-content modal-content-large">
             <div class="modal-header">
                 <h2 id="modalTitle">Nowy Odcinek</h2>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
             </div>
 
             <!-- Zakładki -->
@@ -480,25 +480,10 @@
                 <div id="mediaSubTabAssigned" class="sub-tab-content">
                     <div class="scrollable-tab">
                         <div style="margin-top: 20px;">
-                            <h4 style="margin-bottom: 15px;">Przypisane media do odcinka:</h4>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                <!-- Kolumna MEDIA -->
-                                <div>
-                                    <h5 style="margin-bottom: 10px; color: #ffa726; font-size: 12px; text-transform: uppercase;">📺 MEDIA</h5>
-                                    <div class="assigned-media-list" id="assignedMediaListMedia">
-                                        <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
-                                            Brak mediów MEDIA
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- Kolumna REPORTAZE -->
-                                <div>
-                                    <h5 style="margin-bottom: 10px; color: #66bb6a; font-size: 12px; text-transform: uppercase;">🎬 REPORTAŻE</h5>
-                                    <div class="assigned-media-list" id="assignedMediaListReportaze">
-                                        <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
-                                            Brak mediów REPORTAŻE
-                                        </div>
-                                    </div>
+                            <h4 style="margin-bottom: 15px;">Wszystkie media przypisane do odcinka:</h4>
+                            <div class="assigned-media-list" id="assignedMediaList">
+                                <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
+                                    Brak przypisanych mediów
                                 </div>
                             </div>
                         </div>
@@ -510,26 +495,22 @@
                     <div class="scrollable-tab">
                         <div style="margin-top: 20px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                                <h4>Grupy Mediów (Playlisty):</h4>
+                                <h4>Grupy Mediów:</h4>
                                 <button class="btn btn-primary btn-small" onclick="openAddMediaGroupModal()">+ Nowa Grupa</button>
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                <!-- Kolumna MEDIA -->
-                                <div>
-                                    <h5 style="margin-bottom: 10px; color: #ffa726; font-size: 12px; text-transform: uppercase;">📺 MEDIA</h5>
-                                    <div id="mediaGroupsListMedia">
-                                        <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
-                                            Brak grup MEDIA
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- Kolumna REPORTAZE -->
-                                <div>
-                                    <h5 style="margin-bottom: 10px; color: #66bb6a; font-size: 12px; text-transform: uppercase;">🎬 REPORTAŻE</h5>
-                                    <div id="mediaGroupsListReportaze">
-                                        <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
-                                            Brak grup REPORTAŻE
-                                        </div>
+                            
+                            <!-- Grupy systemowe -->
+                            <div style="margin-bottom: 20px;">
+                                <h5 style="font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 10px;">Grupy systemowe (nie można usunąć)</h5>
+                                <div id="systemGroupsList"></div>
+                            </div>
+                            
+                            <!-- Grupy użytkownika -->
+                            <div>
+                                <h5 style="font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 10px;">Grupy użytkownika</h5>
+                                <div id="userGroupsList">
+                                    <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
+                                        Brak grup użytkownika
                                     </div>
                                 </div>
                             </div>
@@ -550,7 +531,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Nowy Członek Ekipy</h2>
-                <button class="modal-close" onclick="closeAddStaffModal()">&times;</button>
+                <button type="button" class="modal-close" onclick="closeAddStaffModal()">&times;</button>
             </div>
             <form id="addStaffForm">
                 <div class="form-group">
@@ -574,7 +555,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Nowy Typ Członka Ekipy</h2>
-                <button class="modal-close" onclick="closeAddStaffTypeModal()">&times;</button>
+                <button type="button" class="modal-close" onclick="closeAddStaffTypeModal()">&times;</button>
             </div>
             <form id="addStaffTypeForm">
                 <div class="form-group">
@@ -594,7 +575,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Nowy Gość</h2>
-                <button class="modal-close" onclick="closeAddGuestModal()">&times;</button>
+                <button type="button" class="modal-close" onclick="closeAddGuestModal()">&times;</button>
             </div>
             <form id="addGuestForm">
                 <div class="form-group">
@@ -624,7 +605,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Nowy Typ Gościa</h2>
-                <button class="modal-close" onclick="closeAddGuestTypeModal()">&times;</button>
+                <button type="button" class="modal-close" onclick="closeAddGuestTypeModal()">&times;</button>
             </div>
             <form id="addGuestTypeForm">
                 <div class="form-group">
@@ -644,7 +625,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Przypisz Media</h2>
-                <button class="modal-close" onclick="closeAssignMediaModal()">&times;</button>
+                <button type="button" class="modal-close" onclick="closeAssignMediaModal()">&times;</button>
             </div>
             <form id="assignMediaForm">
                 <input type="hidden" id="mediaFilePath">
@@ -662,29 +643,17 @@
                     <textarea class="form-control" id="mediaDescription" rows="3"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Sceny * (wybierz przynajmniej jedną)</label>
-                    <div style="display: flex; gap: 15px;">
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                            <input type="checkbox" id="sceneMedia" value="MEDIA">
-                            <span>MEDIA</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                            <input type="checkbox" id="sceneReportaze" value="REPORTAZE">
-                            <span>REPORTAŻE</span>
-                        </label>
-                    </div>
-                    <div id="sceneError" style="color: #f00; font-size: 10px; margin-top: 5px; display: none;">Wybierz przynajmniej jedną scenę</div>
-                </div>
-                <div class="form-group">
                     <label for="mediaStaff">Autor</label>
                     <select class="form-control" id="mediaStaff">
                         <option value="">Brak</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Grupy mediów (opcjonalnie - można wybrać wiele)</label>
-                    <div id="mediaGroupCheckboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; padding: 8px; background: #1a1a1a;">
-                        <div style="text-align: center; color: #666; font-size: 11px;">Brak dostępnych grup</div>
+                    <label for="mediaGroupsSelect">Grupy * (można wybrać wiele z Ctrl/Cmd)</label>
+                    <select class="form-control" id="mediaGroupsSelect" multiple style="height: 150px;" required>
+                    </select>
+                    <div style="font-size: 10px; color: #888; margin-top: 5px;">
+                        Przytrzymaj Ctrl (Windows/Linux) lub Cmd (Mac) aby wybrać wiele grup
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -700,7 +669,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Edytuj Typy Członka Ekipy</h2>
-                <button class="modal-close" onclick="closeEditStaffTypesModal()">&times;</button>
+                <button type="button" class="modal-close" onclick="closeEditStaffTypesModal()">&times;</button>
             </div>
             <form id="editStaffTypesForm">
                 <input type="hidden" id="editStaffAssignmentId">
@@ -729,7 +698,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Edytuj Gościa</h2>
-                <button class="modal-close" onclick="closeEditGuestModal()">&times;</button>
+                <button type="button" class="modal-close" onclick="closeEditGuestModal()">&times;</button>
             </div>
             <form id="editGuestForm">
                 <input type="hidden" id="editGuestAssignmentId">
@@ -753,35 +722,21 @@
         </div>
     </div>
 
-    <!-- Modal dodawania MediaGroup -->
+    <!-- Modal dodawania grupy mediów -->
     <div class="modal" id="addMediaGroupModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Nowa Grupa Mediów</h2>
-                <button class="modal-close" onclick="closeAddMediaGroupModal()">&times;</button>
+                <button type="button" class="modal-close" onclick="closeAddMediaGroupModal()">&times;</button>
             </div>
             <form id="addMediaGroupForm">
                 <div class="form-group">
-                    <label for="mediaGroupName">Nazwa Grupy *</label>
-                    <input type="text" class="form-control" id="mediaGroupName" required placeholder="np. Blok reportaży tygodnia, Playlista muzyczna">
+                    <label for="groupName">Nazwa grupy *</label>
+                    <input type="text" class="form-control" id="groupName" required>
                 </div>
                 <div class="form-group">
-                    <label for="mediaGroupDescription">Opis</label>
-                    <textarea class="form-control" id="mediaGroupDescription" rows="2" placeholder="Opcjonalny opis grupy"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Sceny * (wybierz przynajmniej jedną)</label>
-                    <div style="display: flex; gap: 15px;">
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                            <input type="checkbox" id="groupSceneMedia" value="MEDIA">
-                            <span>MEDIA</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                            <input type="checkbox" id="groupSceneReportaze" value="REPORTAZE">
-                            <span>REPORTAŻE</span>
-                        </label>
-                    </div>
-                    <div id="groupSceneError" style="color: #f00; font-size: 10px; margin-top: 5px; display: none;">Wybierz przynajmniej jedną scenę</div>
+                    <label for="groupDescription">Opis</label>
+                    <textarea class="form-control" id="groupDescription" rows="3"></textarea>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeAddMediaGroupModal()">Anuluj</button>
@@ -791,47 +746,37 @@
         </div>
     </div>
 
-    <!-- Modal zarządzania MediaGroup -->
+    <!-- Modal zarządzania grupą -->
     <div class="modal" id="manageMediaGroupModal">
-        <div class="modal-content modal-content-large">
+        <div class="modal-content" style="max-width: 700px;">
             <div class="modal-header">
-                <h2 id="manageMediaGroupTitle">Zarządzanie Grupą</h2>
-                <button class="modal-close" onclick="closeManageMediaGroupModal()">&times;</button>
+                <h2 id="manageGroupTitle">Zarządzanie Grupą</h2>
+                <button type="button" class="modal-close" onclick="closeManageMediaGroupModal()">&times;</button>
             </div>
-            <div style="padding: 20px;">
-                <input type="hidden" id="currentMediaGroupId">
-                
-                <div class="form-group">
-                    <label>Opis grupy:</label>
-                    <div style="padding: 8px; background: #1a1a1a; border-radius: 4px; font-size: 12px;" id="mediaGroupInfo"></div>
-                </div>
-
-                <div class="form-group">
-                    <label>Sceny (zaznacz aby przypisać grupę do sceny):</label>
-                    <div style="display: flex; gap: 15px;">
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                            <input type="checkbox" id="manageGroupSceneMedia" value="MEDIA" onchange="updateGroupScenes()">
-                            <span>MEDIA</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                            <input type="checkbox" id="manageGroupSceneReportaze" value="REPORTAZE" onchange="updateGroupScenes()">
-                            <span>REPORTAŻE</span>
-                        </label>
+            <input type="hidden" id="manageGroupId">
+            
+            <div class="form-group">
+                <label for="manageGroupName">Nazwa grupy</label>
+                <input type="text" class="form-control" id="manageGroupName">
+            </div>
+            <div class="form-group">
+                <label for="manageGroupDescription">Opis</label>
+                <textarea class="form-control" id="manageGroupDescription" rows="2"></textarea>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <h4 style="margin-bottom: 10px;">Media w grupie:</h4>
+                <div id="groupMediaList" style="max-height: 300px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; padding: 10px;">
+                    <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
+                        Brak mediów w grupie
                     </div>
                 </div>
-
-                <div style="margin-top: 20px;">
-                    <h4 style="margin-bottom: 10px;">Media w grupie:</h4>
-                    <div id="groupMediaList" style="max-height: 300px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; padding: 10px;">
-                        <div style="text-align: center; color: #666;">Brak mediów w grupie</div>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-danger" onclick="deleteMediaGroup()">Usuń Grupę</button>
-                    <button type="button" class="btn" onclick="closeManageMediaGroupModal()">Zamknij</button>
-                    <button type="button" class="btn btn-success" onclick="setMediaGroupAsCurrent()">Ustaw jako Aktywną</button>
-                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" onclick="deleteMediaGroup()" id="deleteGroupBtn">Usuń Grupę</button>
+                <button type="button" class="btn" onclick="closeManageMediaGroupModal()">Zamknij</button>
+                <button type="button" class="btn btn-primary" onclick="updateMediaGroup()">Zapisz Zmiany</button>
             </div>
         </div>
     </div>

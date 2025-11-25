@@ -40,10 +40,10 @@ func (h *EpisodeMediaHandler) GetEpisodeMedia(w http.ResponseWriter, r *http.Req
 	}
 
 	var media []models.EpisodeMedia
-	result := h.DB.Preload("Scene").
-		Preload("EpisodeStaff.Staff").
+	result := h.DB.Preload("EpisodeStaff.Staff").
 		Preload("EpisodeStaff.StaffTypes.StaffType").
 		Preload("MediaGroups.MediaGroup").
+		Preload("MediaGroups.CurrentScene").
 		Where("episode_id = ?", episodeID).
 		Order("created_at ASC").
 		Find(&media)
@@ -74,20 +74,15 @@ func (h *EpisodeMediaHandler) CreateEpisodeMedia(w http.ResponseWriter, r *http.
 
 	media.EpisodeID = uint(episodeID)
 
-	// Sprawdź czy ten sam plik nie jest już przypisany do tego odcinka I tej sceny
+	// Sprawdź czy ten sam plik nie jest już przypisany do tego odcinka
 	if media.FilePath != nil && *media.FilePath != "" {
 		var existingMedia models.EpisodeMedia
-		result := h.DB.Where("episode_id = ? AND scene_id = ? AND file_path = ?", episodeID, media.SceneID, *media.FilePath).First(&existingMedia)
+		result := h.DB.Where("episode_id = ? AND file_path = ?", episodeID, *media.FilePath).First(&existingMedia)
 		if result.Error == nil {
-			// Znaleziono duplikat - ten sam plik w tej samej scenie
-			http.Error(w, "Ten plik jest już przypisany do tej sceny w tym odcinku", http.StatusConflict)
+			// Znaleziono duplikat
+			http.Error(w, "Ten plik jest już przypisany do tego odcinka", http.StatusConflict)
 			return
 		}
-	}
-
-	// Automatycznie ustaw kolejność jeśli nie podano
-	if media.Order == 0 {
-		media.Order = models.GetNextEpisodeMediaOrder(h.DB, uint(episodeID), media.SceneID)
 	}
 
 	// Jeśli podano FilePath, odczytaj duration
@@ -105,8 +100,7 @@ func (h *EpisodeMediaHandler) CreateEpisodeMedia(w http.ResponseWriter, r *http.
 	}
 
 	// Załaduj relacje
-	h.DB.Preload("Scene").
-		Preload("EpisodeStaff.Staff").
+	h.DB.Preload("EpisodeStaff.Staff").
 		Preload("EpisodeStaff.StaffTypes.StaffType").
 		First(&media, media.ID)
 
@@ -146,13 +140,11 @@ func (h *EpisodeMediaHandler) UpdateEpisodeMedia(w http.ResponseWriter, r *http.
 		return
 	}
 
-	media.SceneID = updateData.SceneID
 	media.EpisodeStaffID = updateData.EpisodeStaffID
 	media.Title = updateData.Title
 	media.Description = updateData.Description
 	media.FilePath = updateData.FilePath
 	media.URL = updateData.URL
-	media.Order = updateData.Order
 
 	// Jeśli zmieniono FilePath, odczytaj nowy duration
 	if media.FilePath != nil && *media.FilePath != "" {
@@ -168,8 +160,7 @@ func (h *EpisodeMediaHandler) UpdateEpisodeMedia(w http.ResponseWriter, r *http.
 		return
 	}
 
-	h.DB.Preload("Scene").
-		Preload("EpisodeStaff.Staff").
+	h.DB.Preload("EpisodeStaff.Staff").
 		Preload("EpisodeStaff.StaffTypes.StaffType").
 		First(&media, media.ID)
 
@@ -202,73 +193,15 @@ func (h *EpisodeMediaHandler) DeleteEpisodeMedia(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Usuń najpierw wszystkie przypisania do grup
+	h.DB.Where("episode_media_id = ?", id).Delete(&models.EpisodeMediaGroup{})
+
 	if err := h.DB.Delete(&media).Error; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// ReorderEpisodeMedia - PUT /api/episodes/{episode_id}/media/{id}/reorder
-func (h *EpisodeMediaHandler) ReorderEpisodeMedia(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
-		return
-	}
-
-	mediaID, err := strconv.ParseUint(vars["id"], 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid media ID", http.StatusBadRequest)
-		return
-	}
-
-	var data struct {
-		Order int `json:"order"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	err = h.DB.Transaction(func(tx *gorm.DB) error {
-		var media models.EpisodeMedia
-		if err := tx.First(&media, mediaID).Error; err != nil {
-			return err
-		}
-
-		oldOrder := media.Order
-		newOrder := data.Order
-
-		if newOrder > oldOrder {
-			// Przesuń w dół elementy między starą a nową pozycją
-			tx.Model(&models.EpisodeMedia{}).
-				Where("episode_id = ? AND \"order\" > ? AND \"order\" <= ?", episodeID, oldOrder, newOrder).
-				UpdateColumn("order", gorm.Expr("\"order\" - 1"))
-		} else if newOrder < oldOrder {
-			// Przesuń w górę elementy między nową a starą pozycją
-			tx.Model(&models.EpisodeMedia{}).
-				Where("episode_id = ? AND \"order\" >= ? AND \"order\" < ?", episodeID, newOrder, oldOrder).
-				UpdateColumn("order", gorm.Expr("\"order\" + 1"))
-		}
-
-		// Ustaw nową kolejność
-		if err := tx.Model(&media).Update("order", newOrder).Error; err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 // UploadMedia - POST /api/episodes/{episode_id}/media/upload
@@ -359,7 +292,6 @@ func (h *EpisodeMediaHandler) ListMediaFiles(w http.ResponseWriter, r *http.Requ
 	var files []map[string]interface{}
 
 	entries, err := os.ReadDir(dirPath)
-	fmt.Println(dirPath)
 	if err != nil {
 		// Folder nie istnieje, zwracamy pustą listę
 		w.Header().Set("Content-Type", "application/json")
@@ -403,32 +335,9 @@ func (h *EpisodeMediaHandler) ListMediaFiles(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(files)
 }
 
-// SetCurrentMedia - POST /api/episodes/{episode_id}/media/{id}/set-current
-func (h *EpisodeMediaHandler) SetCurrentMedia(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
-		return
-	}
-
-	mediaID, err := strconv.ParseUint(vars["id"], 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid media ID", http.StatusBadRequest)
-		return
-	}
-
-	if err := models.SetCurrentEpisodeMedia(h.DB, uint(episodeID), uint(mediaID)); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-}
-
 // GetCurrentMediaForScene - GET /api/episodes/current/media/scene/{scene_name}
-// Pobiera aktualny plik media dla danej sceny z aktualnego odcinka i ustawia go w OBS
+// Pobiera aktywny plik media dla danej sceny z aktualnego odcinka
+// Zwraca pierwszy plik który ma current_in_scene ustawione na tę scenę
 func (h *EpisodeMediaHandler) GetCurrentMediaForScene(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	sceneName := vars["scene_name"]
@@ -455,45 +364,31 @@ func (h *EpisodeMediaHandler) GetCurrentMediaForScene(w http.ResponseWriter, r *
 		return
 	}
 
-	// Szukaj media z is_current=true dla tego odcinka i sceny
-	var currentMedia models.EpisodeMedia
-	result := h.DB.Where("episode_id = ? AND scene_id = ? AND is_current = ?",
-		currentEpisode.ID, scene.ID, true).First(&currentMedia)
+	// Szukaj przypisania media do grupy, które ma current_in_scene ustawione na tę scenę
+	var assignment models.EpisodeMediaGroup
+	result := h.DB.Preload("EpisodeMedia").
+		Preload("MediaGroup").
+		Joins("INNER JOIN episode_media ON episode_media.id = episode_media_groups.episode_media_id").
+		Where("episode_media.episode_id = ? AND episode_media_groups.current_in_scene = ?",
+			currentEpisode.ID, scene.ID).
+		First(&assignment)
 
 	if result.Error == gorm.ErrRecordNotFound {
-		// Nie znaleziono media z is_current=true, szukaj z najniższym order
-		result = h.DB.Where("episode_id = ? AND scene_id = ?",
-			currentEpisode.ID, scene.ID).
-			Order("\"order\" ASC").
-			First(&currentMedia)
-
-		if result.Error == gorm.ErrRecordNotFound {
-			// Brak jakichkolwiek mediów dla tego odcinka i sceny
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": false,
-				"error":   "No media found",
-			})
-			return
-		}
-
-		if result.Error != nil {
-			http.Error(w, result.Error.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Ustaw to media jako current
-		if err := models.SetCurrentEpisodeMedia(h.DB, currentEpisode.ID, currentMedia.ID); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		currentMedia.IsCurrent = true
+		// Brak aktywnego media dla tej sceny
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "No active media found for this scene",
+		})
+		return
 	}
 
 	if result.Error != nil {
 		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	currentMedia := assignment.EpisodeMedia
 
 	// Jeśli mamy plik i OBS jest połączony, ustaw go w źródle
 	if currentMedia.FilePath != nil && *currentMedia.FilePath != "" && h.OBSClient != nil && h.OBSClient.IsConnected() {
@@ -536,5 +431,6 @@ func (h *EpisodeMediaHandler) GetCurrentMediaForScene(w http.ResponseWriter, r *
 		"file_path": currentMedia.FilePath,
 		"url":       currentMedia.URL,
 		"duration":  currentMedia.Duration,
+		"group":     assignment.MediaGroup.Name,
 	})
 }

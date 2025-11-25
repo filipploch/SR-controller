@@ -187,8 +187,8 @@ func main() {
 	api.HandleFunc("/episodes/{episode_id}/media", episodeMediaHandler.CreateEpisodeMedia).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/media/{id}", episodeMediaHandler.UpdateEpisodeMedia).Methods("PUT")
 	api.HandleFunc("/episodes/{episode_id}/media/{id}", episodeMediaHandler.DeleteEpisodeMedia).Methods("DELETE")
-	api.HandleFunc("/episodes/{episode_id}/media/{id}/set-current", episodeMediaHandler.SetCurrentMedia).Methods("POST")
-	api.HandleFunc("/episodes/{episode_id}/media/{id}/reorder", episodeMediaHandler.ReorderEpisodeMedia).Methods("PUT")
+	// USUNIĘTE: SetCurrentMedia - teraz przez MediaGroup
+	// USUNIĘTE: ReorderEpisodeMedia - kolejność teraz w grupie
 	api.HandleFunc("/episodes/{episode_id}/media/upload", episodeMediaHandler.UploadMedia).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/media/files", episodeMediaHandler.ListMediaFiles).Methods("GET")
 	api.HandleFunc("/episodes/current/media/scene/{scene_name}", episodeMediaHandler.GetCurrentMediaForScene).Methods("GET")
@@ -211,7 +211,12 @@ func main() {
 	api.HandleFunc("/media-groups/{id}/reorder", mediaGroupHandler.ReorderMediaGroup).Methods("PUT")
 	api.HandleFunc("/media-groups/{group_id}/items/{id}/reorder", mediaGroupHandler.ReorderMediaGroupItem).Methods("PUT")
 	api.HandleFunc("/media-groups/{group_id}/media/{media_id}", mediaGroupHandler.RemoveMediaFromGroup).Methods("DELETE")
+	api.HandleFunc("/media-groups/{group_id}/media/{media_id}/set-current", mediaGroupHandler.SetCurrentMediaInGroup).Methods("POST")
+	api.HandleFunc("/media-groups/{group_id}/clear-current", mediaGroupHandler.ClearCurrentMediaInGroup).Methods("POST")
+	api.HandleFunc("/media-groups/{group_id}/current", mediaGroupHandler.GetCurrentMediaInGroup).Methods("GET")
 	api.HandleFunc("/episodes/{episode_id}/media-groups/{group_id}/set-current", mediaGroupHandler.SetCurrentMediaGroup).Methods("POST")
+	api.HandleFunc("/episodes/{episode_id}/media-groups/clear-current", mediaGroupHandler.ClearCurrentMediaGroupHandler).Methods("POST")
+	api.HandleFunc("/episodes/{episode_id}/media-groups/current", mediaGroupHandler.GetCurrentMediaGroupHandler).Methods("GET")
 
 	log.Println("========================================")
 	log.Println("Serwer działa: http://localhost:8080")

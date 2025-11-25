@@ -29,7 +29,7 @@ type Episode struct {
 	IsCurrent     bool           `gorm:"default:false;index" json:"is_current"` // Czy to aktualny odcinek
 	Staff         []EpisodeStaff `gorm:"foreignKey:EpisodeID" json:"staff"`
 	Guests        []EpisodeGuest `gorm:"foreignKey:EpisodeID" json:"guests"`
-	Reportages    []EpisodeMedia `gorm:"foreignKey:EpisodeID;constraint:OnDelete:CASCADE" json:"reportages"`
+	MediaGroups   []MediaGroup   `gorm:"foreignKey:EpisodeID" json:"media_groups"`
 	Media         []EpisodeMedia `gorm:"foreignKey:EpisodeID;constraint:OnDelete:CASCADE" json:"media"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
@@ -37,9 +37,8 @@ type Episode struct {
 
 // StaffType reprezentuje typ członka ekipy
 type StaffType struct {
-	ID   uint   `gorm:"primaryKey" json:"id"`
-	Name string `gorm:"size:100;uniqueIndex;not null" json:"name"` // np. "Redaktor prowadzący", "Realizator dźwięku"
-	// Staff     []Staff   `gorm:"foreignKey:StaffTypeID" json:"staff"`
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	Name      string    `gorm:"size:100;uniqueIndex;not null" json:"name"` // np. "Redaktor prowadzący", "Realizator dźwięku"
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -106,31 +105,38 @@ type EpisodeGuest struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-// MediaGroup reprezentuje grupę mediów (np. "Blok reportaży", "Playlista muzyczna")
+// MediaGroup reprezentuje grupę mediów dla odcinka
+// Każdy odcinek ma dwie grupy systemowe: MEDIA i REPORTAZE
+// Użytkownik może tworzyć dodatkowe grupy
 type MediaGroup struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	EpisodeID   uint      `gorm:"index;not null" json:"episode_id"`    // Przypisanie do odcinka
-	Episode     Episode   `gorm:"foreignKey:EpisodeID" json:"episode"` // Relacja do odcinka
-	SceneID     uint      `gorm:"index;not null" json:"scene_id"`      // Przypisanie do sceny (MEDIA lub REPORTAZE)
-	Scene       Scene     `gorm:"foreignKey:SceneID" json:"scene"`     // Relacja do sceny
-	Name        string    `gorm:"size:200;not null" json:"name"`
-	Description string    `gorm:"type:text" json:"description"`
-	Order       int       `gorm:"not null" json:"order"`                 // Kolejność w odcinku (unique per episode)
-	IsCurrent   bool      `gorm:"default:false;index" json:"is_current"` // Czy aktywna w odcinku
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID             uint                `gorm:"primaryKey" json:"id"`
+	EpisodeID      uint                `gorm:"index;not null" json:"episode_id"`
+	Episode        Episode             `gorm:"foreignKey:EpisodeID" json:"episode"`
+	Name           string              `gorm:"size:200;not null" json:"name"`
+	Description    string              `gorm:"type:text" json:"description"`
+	Order          int                 `gorm:"not null" json:"order"`          // Kolejność w odcinku
+	IsSystem       bool                `gorm:"default:false" json:"is_system"` // true dla grup MEDIA i REPORTAZE
+	CurrentInScene *uint               `gorm:"index" json:"current_in_scene"`  // NULL = nieużywana, 0 = w obu scenach, scene_id = w konkretnej scenie
+	CurrentScene   *Scene              `gorm:"foreignKey:CurrentInScene" json:"current_scene,omitempty"`
+	MediaItems     []EpisodeMediaGroup `gorm:"foreignKey:MediaGroupID" json:"media_items"`
+	CreatedAt      time.Time           `json:"created_at"`
+	UpdatedAt      time.Time           `json:"updated_at"`
 }
 
-// EpisodeMediaGroup reprezentuje przypisanie media do grupy w kontekście odcinka
-// Pozwala na tworzenie playlist i grup reportaży
+// EpisodeMediaGroup reprezentuje przypisanie media do grupy
+// CurrentInScene określa gdzie plik jest aktywny:
+// NULL = nieaktywny w żadnej scenie
+// 0 = aktywny w obu scenach (MEDIA i REPORTAZE)
+// scene_id = aktywny tylko w tej konkretnej scenie
 type EpisodeMediaGroup struct {
 	ID             uint         `gorm:"primaryKey" json:"id"`
 	EpisodeMediaID uint         `gorm:"index;not null" json:"episode_media_id"`
 	EpisodeMedia   EpisodeMedia `gorm:"foreignKey:EpisodeMediaID" json:"episode_media"`
 	MediaGroupID   uint         `gorm:"index;not null" json:"media_group_id"`
 	MediaGroup     MediaGroup   `gorm:"foreignKey:MediaGroupID" json:"media_group"`
-	Order          int          `gorm:"not null" json:"order"`           // Kolejność w grupie (unique per group)
-	IsCurrent      bool         `gorm:"default:false" json:"is_current"` // Czy media jest aktywne w źródle List
+	Order          int          `gorm:"not null" json:"order"`         // Kolejność w grupie
+	CurrentInScene *uint        `gorm:"index" json:"current_in_scene"` // NULL = nieaktywny, 0 = w obu scenach, scene_id = w konkretnej scenie
+	CurrentScene   *Scene       `gorm:"foreignKey:CurrentInScene" json:"current_scene,omitempty"`
 	CreatedAt      time.Time    `json:"created_at"`
 }
 
@@ -159,13 +165,10 @@ type Source struct {
 }
 
 // EpisodeMedia reprezentuje media (reportaże, filmy) przypisane do odcinka
-// Scena określa typ media: MEDIA lub REPORTAZE
 type EpisodeMedia struct {
 	ID             uint                `gorm:"primaryKey" json:"id"`
 	EpisodeID      uint                `gorm:"index;not null" json:"episode_id"`
 	Episode        Episode             `gorm:"foreignKey:EpisodeID" json:"episode"`
-	SceneID        uint                `gorm:"index;not null" json:"scene_id"` // MEDIA lub REPORTAZE
-	Scene          Scene               `gorm:"foreignKey:SceneID" json:"scene"`
 	EpisodeStaffID *uint               `gorm:"index" json:"episode_staff_id"`                  // Autor z przypisanej ekipy (nullable)
 	EpisodeStaff   *EpisodeStaff       `gorm:"foreignKey:EpisodeStaffID" json:"episode_staff"` // Autor z przypisanej ekipy (nullable)
 	Title          string              `gorm:"size:300;not null" json:"title"`
@@ -173,8 +176,6 @@ type EpisodeMedia struct {
 	FilePath       *string             `gorm:"size:1000" json:"file_path"`                    // Ścieżka do pliku (nullable)
 	URL            *string             `gorm:"size:1000" json:"url"`                          // URL jeśli zewnętrzne (nullable)
 	Duration       int                 `json:"duration"`                                      // Czas trwania w sekundach
-	Order          int                 `gorm:"default:0" json:"order"`                        // Kolejność w odcinku
-	IsCurrent      bool                `gorm:"default:false" json:"is_current"`               // Czy wczytany w źródło Single
 	MediaGroups    []EpisodeMediaGroup `gorm:"foreignKey:EpisodeMediaID" json:"media_groups"` // Przynależność do grup
 	CreatedAt      time.Time           `json:"created_at"`
 	UpdatedAt      time.Time           `json:"updated_at"`
@@ -285,6 +286,7 @@ func SetCurrentEpisode(db *gorm.DB, episodeID uint) error {
 }
 
 // CreateEpisodeAsCurrent tworzy nowy odcinek i ustawia go jako aktualny
+// Automatycznie tworzy dwie grupy systemowe: MEDIA i REPORTAZE
 func CreateEpisodeAsCurrent(db *gorm.DB, episode *Episode) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		// Wyłącz wszystkie odcinki
@@ -296,6 +298,86 @@ func CreateEpisodeAsCurrent(db *gorm.DB, episode *Episode) error {
 		episode.IsCurrent = true
 		if err := tx.Create(episode).Error; err != nil {
 			return err
+		}
+
+		// Utwórz grupy systemowe MEDIA i REPORTAZE
+		systemGroups := []MediaGroup{
+			{
+				EpisodeID:   episode.ID,
+				Name:        "MEDIA",
+				Description: "Grupa systemowa dla mediów",
+				Order:       0,
+				IsSystem:    true,
+			},
+			{
+				EpisodeID:   episode.ID,
+				Name:        "REPORTAZE",
+				Description: "Grupa systemowa dla reportaży",
+				Order:       1,
+				IsSystem:    true,
+			},
+		}
+
+		for _, group := range systemGroups {
+			if err := tx.Create(&group).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// CreateSystemMediaGroupsForEpisode tworzy grupy systemowe dla istniejącego odcinka
+// Używane przy migracji lub jeśli grupy nie zostały utworzone
+func CreateSystemMediaGroupsForEpisode(db *gorm.DB, episodeID uint) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Sprawdź czy odcinek istnieje
+		var episode Episode
+		if err := tx.First(&episode, episodeID).Error; err != nil {
+			return err
+		}
+
+		// Sprawdź czy grupy systemowe już istnieją
+		var existingGroups []MediaGroup
+		tx.Where("episode_id = ? AND is_system = ?", episodeID, true).Find(&existingGroups)
+
+		hasMedia := false
+		hasReportaze := false
+		for _, g := range existingGroups {
+			if g.Name == "MEDIA" {
+				hasMedia = true
+			}
+			if g.Name == "REPORTAZE" {
+				hasReportaze = true
+			}
+		}
+
+		// Utwórz brakujące grupy systemowe
+		if !hasMedia {
+			group := MediaGroup{
+				EpisodeID:   episodeID,
+				Name:        "MEDIA",
+				Description: "Grupa systemowa dla mediów",
+				Order:       0,
+				IsSystem:    true,
+			}
+			if err := tx.Create(&group).Error; err != nil {
+				return err
+			}
+		}
+
+		if !hasReportaze {
+			group := MediaGroup{
+				EpisodeID:   episodeID,
+				Name:        "REPORTAZE",
+				Description: "Grupa systemowa dla reportaży",
+				Order:       1,
+				IsSystem:    true,
+			}
+			if err := tx.Create(&group).Error; err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -328,24 +410,63 @@ func GetMediaSceneByName(db *gorm.DB, name string) (*Scene, error) {
 	return &scene, nil
 }
 
-// SetCurrentEpisodeMedia ustawia media jako current (wczytane w źródło Single)
-func SetCurrentEpisodeMedia(db *gorm.DB, episodeID uint, mediaID uint) error {
+// SetCurrentMediaInGroup ustawia media jako aktywne w danej scenie lub w obu scenach
+// sceneID: konkretne ID sceny, lub 0 dla obu scen
+// Wyłącza inne media z tej samej grupy w tej scenie/scenach
+// WAŻNE: Jeśli stare media miało current_in_scene = 0 (obie sceny) i zmieniamy tylko jedną scenę,
+// to stare media zostaje z current_in_scene ustawionym na drugą scenę (split)
+func SetCurrentMediaInGroup(db *gorm.DB, groupID uint, mediaID uint, sceneID uint) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		// Pobierz media aby znać scenę
-		var media EpisodeMedia
-		if err := tx.First(&media, mediaID).Error; err != nil {
+		// Sprawdź czy przypisanie istnieje
+		var assignment EpisodeMediaGroup
+		if err := tx.Where("media_group_id = ? AND episode_media_id = ?", groupID, mediaID).First(&assignment).Error; err != nil {
 			return err
 		}
 
-		// Wyłącz wszystkie media tej samej sceny w tym odcinku
-		if err := tx.Model(&EpisodeMedia{}).
-			Where("episode_id = ? AND scene_id = ? AND is_current = ?", episodeID, media.SceneID, true).
-			Update("is_current", false).Error; err != nil {
-			return err
+		if sceneID == 0 {
+			// Ustawiamy media w obu scenach - wyłącz wszystkie inne media w grupie
+			if err := tx.Model(&EpisodeMediaGroup{}).
+				Where("media_group_id = ? AND id != ? AND current_in_scene IS NOT NULL", groupID, assignment.ID).
+				Update("current_in_scene", nil).Error; err != nil {
+				return err
+			}
+		} else {
+			// Szukamy media które jest aktywne w obu scenach (current_in_scene = 0)
+			var mediaInBothScenes EpisodeMediaGroup
+			err := tx.Where("media_group_id = ? AND current_in_scene = 0", groupID).First(&mediaInBothScenes).Error
+
+			if err == nil && mediaInBothScenes.ID != assignment.ID {
+				// Znaleziono media aktywne w obu scenach - wykonaj split
+				// Pobierz ID drugiej sceny (MEDIA i REPORTAZE)
+				var scenes []Scene
+				if err := tx.Where("name IN ?", []string{"MEDIA", "REPORTAZE"}).Find(&scenes).Error; err != nil {
+					return err
+				}
+
+				var otherSceneID uint
+				for _, scene := range scenes {
+					if scene.ID != sceneID {
+						otherSceneID = scene.ID
+						break
+					}
+				}
+
+				// Ustaw stare media tylko na drugą scenę
+				if err := tx.Model(&mediaInBothScenes).Update("current_in_scene", otherSceneID).Error; err != nil {
+					return err
+				}
+			}
+
+			// Wyłącz media które są aktywne tylko w tej konkretnej scenie
+			if err := tx.Model(&EpisodeMediaGroup{}).
+				Where("media_group_id = ? AND id != ? AND current_in_scene = ?", groupID, assignment.ID, sceneID).
+				Update("current_in_scene", nil).Error; err != nil {
+				return err
+			}
 		}
 
-		// Włącz wybrane media
-		if err := tx.Model(&media).Update("is_current", true).Error; err != nil {
+		// Ustaw wybrane media jako aktywne
+		if err := tx.Model(&assignment).Update("current_in_scene", sceneID).Error; err != nil {
 			return err
 		}
 
@@ -353,35 +474,50 @@ func SetCurrentEpisodeMedia(db *gorm.DB, episodeID uint, mediaID uint) error {
 	})
 }
 
-// SetCurrentMediaGroup ustawia grupę jako current (wczytana w źródło List)
-func SetCurrentMediaGroup(db *gorm.DB, episodeID uint, groupID uint) error {
-	return db.Transaction(func(tx *gorm.DB) error {
-		// Wyłącz wszystkie grupy w tym odcinku
-		if err := tx.Model(&MediaGroup{}).
-			Where("episode_id = ? AND is_current = ?", episodeID, true).
-			Update("is_current", false).Error; err != nil {
-			return err
-		}
-
-		// Włącz wybraną grupę
-		if err := tx.Model(&MediaGroup{}).
-			Where("id = ?", groupID).
-			Update("is_current", true).Error; err != nil {
-			return err
-		}
-
-		return nil
-	})
-}
-
-// GetNextEpisodeMediaOrder zwraca następny dostępny numer kolejności dla media w odcinku i scenie
-func GetNextEpisodeMediaOrder(db *gorm.DB, episodeID uint, sceneID uint) int {
-	var maxMedia EpisodeMedia
-	result := db.Where("episode_id = ? AND scene_id = ?", episodeID, sceneID).Order("\"order\" DESC").First(&maxMedia)
-	if result.Error != nil {
-		return 0
+// ClearCurrentMediaInGroup wyłącza aktywne media w grupie dla danej sceny lub obu scen
+// sceneID: konkretne ID sceny, lub 0 dla obu scen
+func ClearCurrentMediaInGroup(db *gorm.DB, groupID uint, sceneID uint) error {
+	if sceneID == 0 {
+		// Wyłącz wszystkie media w grupie
+		return db.Model(&EpisodeMediaGroup{}).
+			Where("media_group_id = ? AND current_in_scene IS NOT NULL", groupID).
+			Update("current_in_scene", nil).Error
 	}
-	return maxMedia.Order + 1
+
+	// Wyłącz media w konkretnej scenie lub te co są w obu scenach
+	return db.Model(&EpisodeMediaGroup{}).
+		Where("media_group_id = ? AND (current_in_scene = ? OR current_in_scene = 0)", groupID, sceneID).
+		Update("current_in_scene", nil).Error
+}
+
+// GetCurrentMediaInGroup pobiera aktywne media w grupie dla danej sceny
+// Zwraca media które są aktywne w tej scenie lub w obu scenach (current_in_scene = 0)
+func GetCurrentMediaInGroup(db *gorm.DB, groupID uint, sceneID uint) (*EpisodeMediaGroup, error) {
+	var assignment EpisodeMediaGroup
+
+	if sceneID == 0 {
+		// Szukaj media aktywnego w obu scenach
+		result := db.Preload("EpisodeMedia").
+			Preload("MediaGroup").
+			Where("media_group_id = ? AND current_in_scene = 0", groupID).
+			First(&assignment)
+
+		if result.Error != nil {
+			return nil, result.Error
+		}
+	} else {
+		// Szukaj media aktywnego w tej konkretnej scenie lub w obu scenach
+		result := db.Preload("EpisodeMedia").
+			Preload("MediaGroup").
+			Where("media_group_id = ? AND (current_in_scene = ? OR current_in_scene = 0)", groupID, sceneID).
+			First(&assignment)
+
+		if result.Error != nil {
+			return nil, result.Error
+		}
+	}
+
+	return &assignment, nil
 }
 
 // GetNextMediaGroupOrder zwraca następny dostępny numer kolejności dla grupy w odcinku
@@ -402,4 +538,112 @@ func GetNextMediaGroupItemOrder(db *gorm.DB, groupID uint) int {
 		return 0
 	}
 	return maxItem.Order + 1
+}
+
+// SetCurrentMediaGroup ustawia grupę jako aktywną w danej scenie lub w obu scenach
+// sceneID: konkretne ID sceny, lub 0 dla obu scen
+// Wyłącza inne grupy w tym odcinku dla tej sceny/scen
+// WAŻNE: Jeśli stara grupa miała current_in_scene = 0 (obie sceny) i zmieniamy tylko jedną scenę,
+// to stara grupa zostaje z current_in_scene ustawionym na drugą scenę (split)
+func SetCurrentMediaGroup(db *gorm.DB, episodeID uint, groupID uint, sceneID uint) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Sprawdź czy grupa istnieje
+		var group MediaGroup
+		if err := tx.First(&group, groupID).Error; err != nil {
+			return err
+		}
+
+		if sceneID == 0 {
+			// Ustawiamy grupę w obu scenach - wyłącz wszystkie inne grupy
+			if err := tx.Model(&MediaGroup{}).
+				Where("episode_id = ? AND id != ? AND current_in_scene IS NOT NULL", episodeID, groupID).
+				Update("current_in_scene", nil).Error; err != nil {
+				return err
+			}
+		} else {
+			// Szukamy grupy która jest aktywna w obu scenach (current_in_scene = 0)
+			var groupInBothScenes MediaGroup
+			err := tx.Where("episode_id = ? AND current_in_scene = 0", episodeID).First(&groupInBothScenes).Error
+
+			if err == nil && groupInBothScenes.ID != groupID {
+				// Znaleziono grupę aktywną w obu scenach - wykonaj split
+				// Pobierz ID drugiej sceny (MEDIA i REPORTAZE)
+				var scenes []Scene
+				if err := tx.Where("name IN ?", []string{"MEDIA", "REPORTAZE"}).Find(&scenes).Error; err != nil {
+					return err
+				}
+
+				var otherSceneID uint
+				for _, scene := range scenes {
+					if scene.ID != sceneID {
+						otherSceneID = scene.ID
+						break
+					}
+				}
+
+				// Ustaw starą grupę tylko na drugą scenę
+				if err := tx.Model(&groupInBothScenes).Update("current_in_scene", otherSceneID).Error; err != nil {
+					return err
+				}
+			}
+
+			// Wyłącz grupy które są aktywne tylko w tej konkretnej scenie
+			if err := tx.Model(&MediaGroup{}).
+				Where("episode_id = ? AND id != ? AND current_in_scene = ?", episodeID, groupID, sceneID).
+				Update("current_in_scene", nil).Error; err != nil {
+				return err
+			}
+		}
+
+		// Ustaw wybraną grupę jako aktywną
+		if err := tx.Model(&group).Update("current_in_scene", sceneID).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+// ClearCurrentMediaGroup wyłącza aktywną grupę w odcinku dla danej sceny lub obu scen
+// sceneID: konkretne ID sceny, lub 0 dla obu scen
+func ClearCurrentMediaGroup(db *gorm.DB, episodeID uint, sceneID uint) error {
+	if sceneID == 0 {
+		// Wyłącz wszystkie grupy w odcinku
+		return db.Model(&MediaGroup{}).
+			Where("episode_id = ? AND current_in_scene IS NOT NULL", episodeID).
+			Update("current_in_scene", nil).Error
+	}
+
+	// Wyłącz grupy w konkretnej scenie lub te co są w obu scenach
+	return db.Model(&MediaGroup{}).
+		Where("episode_id = ? AND (current_in_scene = ? OR current_in_scene = 0)", episodeID, sceneID).
+		Update("current_in_scene", nil).Error
+}
+
+// GetCurrentMediaGroup pobiera aktywną grupę w odcinku dla danej sceny
+// Zwraca grupę która jest aktywna w tej scenie lub w obu scenach (current_in_scene = 0)
+func GetCurrentMediaGroup(db *gorm.DB, episodeID uint, sceneID uint) (*MediaGroup, error) {
+	var group MediaGroup
+
+	if sceneID == 0 {
+		// Szukaj grupy aktywnej w obu scenach
+		result := db.Preload("Episode").
+			Where("episode_id = ? AND current_in_scene = 0", episodeID).
+			First(&group)
+
+		if result.Error != nil {
+			return nil, result.Error
+		}
+	} else {
+		// Szukaj grupy aktywnej w tej konkretnej scenie lub w obu scenach
+		result := db.Preload("Episode").
+			Where("episode_id = ? AND (current_in_scene = ? OR current_in_scene = 0)", episodeID, sceneID).
+			First(&group)
+
+		if result.Error != nil {
+			return nil, result.Error
+		}
+	}
+
+	return &group, nil
 }
