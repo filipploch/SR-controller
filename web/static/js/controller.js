@@ -10,6 +10,63 @@ const socket = io();
 const socketStatus = document.getElementById('socketStatus');
 const obsStatus = document.getElementById('obsStatus');
 
+// Funkcje przełączania zakładek
+function switchTab(group, tabName) {
+    const tabButton = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+    const tabContent = document.getElementById(`tab-${tabName}`);
+    
+    if (!tabButton || !tabContent) return;
+    
+    // Znajdź grupę zakładek
+    const tabButtons = tabButton.parentElement;
+    const tabsContainer = tabButtons.parentElement;
+    
+    // Wyłącz wszystkie przyciski i zawartość w tej grupie
+    tabButtons.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    tabsContainer.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    // Włącz wybraną zakładkę
+    tabButton.classList.add('active');
+    tabContent.classList.add('active');
+}
+
+// Funkcje sterowania OBS
+function obsStartStreaming() {
+    socket.emit('obs_start_streaming', JSON.stringify({}), (response) => {
+        console.log('Start streaming:', response);
+    });
+}
+
+function obsStopStreaming() {
+    socket.emit('obs_stop_streaming', JSON.stringify({}), (response) => {
+        console.log('Stop streaming:', response);
+    });
+}
+
+function obsStartRecording() {
+    socket.emit('obs_start_recording', JSON.stringify({}), (response) => {
+        console.log('Start recording:', response);
+    });
+}
+
+function obsStopRecording() {
+    socket.emit('obs_stop_recording', JSON.stringify({}), (response) => {
+        console.log('Stop recording:', response);
+    });
+}
+
+function obsToggleStudioMode() {
+    socket.emit('obs_toggle_studio_mode', JSON.stringify({}), (response) => {
+        console.log('Toggle studio mode:', response);
+    });
+}
+
+function obsTransition() {
+    socket.emit('obs_trigger_transition', JSON.stringify({}), (response) => {
+        console.log('Trigger transition:', response);
+    });
+}
+
 socket.on('connect', () => {
 	console.log('Połączono z Socket.IO');
 	socketStatus.classList.add('connected');
@@ -25,6 +82,45 @@ socket.on('source_changed', (data) => {
 	console.log('Zmieniono źródło:', data);
 	updateSourceButton(data.scene_name, data.source_name, data.visible);
 });
+
+// Ładowanie aktualnego media dla przycisków Media1 i Reportaze1
+async function loadCurrentMediaButtons() {
+	await loadCurrentMediaButton('MEDIA', 'Media1');
+	await loadCurrentMediaButton('REPORTAZE', 'Reportaze1');
+}
+
+async function loadCurrentMediaButton(sceneName, sourceName) {
+	try {
+		const response = await fetch(`/api/episodes/current/media/scene/${sceneName}`);
+		const data = await response.json();
+		
+		const containerId = `sources-${sceneName.toLowerCase()}`;
+		const container = document.getElementById(containerId);
+		if (!container) return;
+		
+		// Znajdź przycisk dla tego źródła
+		const button = container.querySelector(`[data-source-name="${sourceName}"]`);
+		if (!button) return;
+		
+		if (data.success && data.title) {
+			// Zaktualizuj tekst przycisku na tytuł z bazy
+			button.textContent = data.title;
+			
+			// Ustaw jako aktywny (ponieważ media jest załadowane)
+			button.classList.add('active');
+			
+			// Zapisz ID media w atrybucie data
+			button.dataset.mediaId = data.media_id;
+		} else {
+			// Brak media - przywróć oryginalną nazwę
+			button.textContent = sourceName;
+			button.classList.remove('active');
+			button.removeAttribute('data-media-id');
+		}
+	} catch (error) {
+		console.error(`Błąd ładowania media dla ${sceneName}:`, error);
+	}
+}
 
 function loadAllScenes() {
 	SCENES.forEach(sceneName => {
@@ -119,9 +215,11 @@ function renderSources(sceneName, sources) {
 	reversedSources.forEach(source => {
 		const button = document.createElement('button');
 		button.className = 'source-btn';
-		button.textContent = source.sourceName || source.source_name || 'Źródło';
+		
+		const sourceName = source.sourceName || source.source_name || 'Źródło';
+		button.textContent = sourceName;
 		button.dataset.sceneName = sceneName;
-		button.dataset.sourceName = source.sourceName || source.source_name;
+		button.dataset.sourceName = sourceName;
 		button.dataset.sceneItemId = source.sceneItemId || 0;
 		
 		const isVisible = source.sceneItemEnabled !== undefined 
@@ -145,6 +243,12 @@ function renderSources(sceneName, sources) {
 		
 		container.appendChild(button);
 	});
+	
+	// Po wyrenderowaniu źródeł, załaduj aktualne media dla Media1 i Reportaze1
+	if (sceneName === 'MEDIA' || sceneName === 'REPORTAZE') {
+		const mediaSourceName = sceneName === 'MEDIA' ? 'Media1' : 'Reportaze1';
+		loadCurrentMediaButton(sceneName, mediaSourceName);
+	}
 }
 
 function switchMainSource(sceneName, sourceName, sceneItemId) {

@@ -179,10 +179,17 @@
             border-radius: 3px;
             margin-bottom: 6px;
             font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .assigned-media-item:hover {
+            background: #252525;
         }
 
         .media-item-details {
             flex: 1;
+            pointer-events: none;
         }
 
         .media-item-title {
@@ -473,12 +480,25 @@
                 <div id="mediaSubTabAssigned" class="sub-tab-content">
                     <div class="scrollable-tab">
                         <div style="margin-top: 20px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                <h4>Przypisane media do odcinka:</h4>
-                            </div>
-                            <div class="assigned-media-list" id="assignedMediaList">
-                                <div style="text-align: center; padding: 20px; color: #666;">
-                                    Brak przypisanych mediów
+                            <h4 style="margin-bottom: 15px;">Przypisane media do odcinka:</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <!-- Kolumna MEDIA -->
+                                <div>
+                                    <h5 style="margin-bottom: 10px; color: #ffa726; font-size: 12px; text-transform: uppercase;">📺 MEDIA</h5>
+                                    <div class="assigned-media-list" id="assignedMediaListMedia">
+                                        <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
+                                            Brak mediów MEDIA
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Kolumna REPORTAZE -->
+                                <div>
+                                    <h5 style="margin-bottom: 10px; color: #66bb6a; font-size: 12px; text-transform: uppercase;">🎬 REPORTAŻE</h5>
+                                    <div class="assigned-media-list" id="assignedMediaListReportaze">
+                                        <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
+                                            Brak mediów REPORTAŻE
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -489,13 +509,28 @@
                 <div id="mediaSubTabGroups" class="sub-tab-content">
                     <div class="scrollable-tab">
                         <div style="margin-top: 20px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                                 <h4>Grupy Mediów (Playlisty):</h4>
                                 <button class="btn btn-primary btn-small" onclick="openAddMediaGroupModal()">+ Nowa Grupa</button>
                             </div>
-                            <div id="mediaGroupsList">
-                                <div style="text-align: center; padding: 20px; color: #666;">
-                                    Brak grup mediów
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <!-- Kolumna MEDIA -->
+                                <div>
+                                    <h5 style="margin-bottom: 10px; color: #ffa726; font-size: 12px; text-transform: uppercase;">📺 MEDIA</h5>
+                                    <div id="mediaGroupsListMedia">
+                                        <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
+                                            Brak grup MEDIA
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Kolumna REPORTAZE -->
+                                <div>
+                                    <h5 style="margin-bottom: 10px; color: #66bb6a; font-size: 12px; text-transform: uppercase;">🎬 REPORTAŻE</h5>
+                                    <div id="mediaGroupsListReportaze">
+                                        <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
+                                            Brak grup REPORTAŻE
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -627,10 +662,18 @@
                     <textarea class="form-control" id="mediaDescription" rows="3"></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="mediaSource">Scena (Typ) *</label>
-                    <select class="form-control" id="mediaSource" required>
-                        <option value="">Wybierz...</option>
-                    </select>
+                    <label>Sceny * (wybierz przynajmniej jedną)</label>
+                    <div style="display: flex; gap: 15px;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="sceneMedia" value="MEDIA">
+                            <span>MEDIA</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="sceneReportaze" value="REPORTAZE">
+                            <span>REPORTAŻE</span>
+                        </label>
+                    </div>
+                    <div id="sceneError" style="color: #f00; font-size: 10px; margin-top: 5px; display: none;">Wybierz przynajmniej jedną scenę</div>
                 </div>
                 <div class="form-group">
                     <label for="mediaStaff">Autor</label>
@@ -639,10 +682,10 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="mediaGroupSelect">Grupa mediów (opcjonalnie)</label>
-                    <select class="form-control" id="mediaGroupSelect">
-                        <option value="">Nie przypisuj do grupy</option>
-                    </select>
+                    <label>Grupy mediów (opcjonalnie - można wybrać wiele)</label>
+                    <div id="mediaGroupCheckboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; padding: 8px; background: #1a1a1a;">
+                        <div style="text-align: center; color: #666; font-size: 11px;">Brak dostępnych grup</div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeAssignMediaModal()">Anuluj</button>
@@ -726,6 +769,20 @@
                     <label for="mediaGroupDescription">Opis</label>
                     <textarea class="form-control" id="mediaGroupDescription" rows="2" placeholder="Opcjonalny opis grupy"></textarea>
                 </div>
+                <div class="form-group">
+                    <label>Sceny * (wybierz przynajmniej jedną)</label>
+                    <div style="display: flex; gap: 15px;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="groupSceneMedia" value="MEDIA">
+                            <span>MEDIA</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="groupSceneReportaze" value="REPORTAZE">
+                            <span>REPORTAŻE</span>
+                        </label>
+                    </div>
+                    <div id="groupSceneError" style="color: #f00; font-size: 10px; margin-top: 5px; display: none;">Wybierz przynajmniej jedną scenę</div>
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeAddMediaGroupModal()">Anuluj</button>
                     <button type="submit" class="btn btn-primary">Utwórz</button>
@@ -749,6 +806,20 @@
                     <div style="padding: 8px; background: #1a1a1a; border-radius: 4px; font-size: 12px;" id="mediaGroupInfo"></div>
                 </div>
 
+                <div class="form-group">
+                    <label>Sceny (zaznacz aby przypisać grupę do sceny):</label>
+                    <div style="display: flex; gap: 15px;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="manageGroupSceneMedia" value="MEDIA" onchange="updateGroupScenes()">
+                            <span>MEDIA</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                            <input type="checkbox" id="manageGroupSceneReportaze" value="REPORTAZE" onchange="updateGroupScenes()">
+                            <span>REPORTAŻE</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div style="margin-top: 20px;">
                     <h4 style="margin-bottom: 10px;">Media w grupie:</h4>
                     <div id="groupMediaList" style="max-height: 300px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; padding: 10px;">
@@ -765,7 +836,7 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="/static/js/Sortable.min.js"></script>
     <script src="/static/js/episodes-manager.js"></script>
 </body>
 </html>

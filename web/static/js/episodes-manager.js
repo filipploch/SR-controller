@@ -6,6 +6,8 @@ let allGuests = [];
 let staffTypes = [];
 let guestTypes = [];
 let sources = [];
+let mediaSceneId = null;
+let reportazeSceneId = null;
 let currentEpisodeId = null;
 let assignedStaff = [];
 let assignedGuests = [];
@@ -952,24 +954,17 @@ async function loadMediaScenes() {
         // Store scenes
         window.mediaScenes = scenes;
         
-        updateMediaSourceSelect();
+        // Zapisz ID scen
+        const mediaScene = scenes.find(s => s.name === 'MEDIA');
+        const reportazeScene = scenes.find(s => s.name === 'REPORTAZE');
+        
+        if (mediaScene) mediaSceneId = mediaScene.id;
+        if (reportazeScene) reportazeSceneId = reportazeScene.id;
+        
         updateMediaStaffSelect();
     } catch (error) {
         console.error('Błąd ładowania scen:', error);
     }
-}
-
-function updateMediaSourceSelect() {
-    const select = document.getElementById('mediaSource');
-    if (!window.mediaScenes) {
-        select.innerHTML = '<option value="">Ładowanie...</option>';
-        return;
-    }
-    
-    select.innerHTML = '<option value="">Wybierz...</option>' +
-        window.mediaScenes.map(scene => 
-            `<option value="${scene.id}">${scene.name}</option>`
-        ).join('');
 }
 
 function updateMediaStaffSelect() {
@@ -982,12 +977,44 @@ function updateMediaStaffSelect() {
 }
 
 function updateMediaGroupSelect() {
-    const select = document.getElementById('mediaGroupSelect');
-    if (!select) return; // Element nie istnieje jeśli formularz nie jest otwarty
-    select.innerHTML = '<option value="">Nie przypisuj do grupy</option>' +
-        mediaGroups.map(group => 
-            `<option value="${group.id}">${group.name}</option>`
-        ).join('');
+    const container = document.getElementById('mediaGroupCheckboxes');
+    if (!container) return; // Element nie istnieje jeśli formularz nie jest otwarty
+    
+    if (mediaGroups.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #666; font-size: 11px;">Brak dostępnych grup</div>';
+        return;
+    }
+    
+    // Grupuj według nazwy - traktuj grupy o tej samej nazwie jako jedną
+    const groupsByName = {};
+    mediaGroups.forEach(group => {
+        if (!groupsByName[group.name]) {
+            groupsByName[group.name] = {
+                name: group.name,
+                ids: [],
+                scenes: []
+            };
+        }
+        groupsByName[group.name].ids.push(group.id);
+        if (group.scene) {
+            groupsByName[group.name].scenes.push(group.scene.name);
+        }
+    });
+    
+    // Renderuj unikalne grupy
+    const uniqueGroups = Object.values(groupsByName);
+    
+    container.innerHTML = uniqueGroups.map(group => {
+        // Deduplikuj sceny
+        const uniqueScenes = [...new Set(group.scenes)];
+        const sceneLabel = uniqueScenes.length > 0 ? ` (${uniqueScenes.join(', ')})` : '';
+        const groupIdsStr = group.ids.join(','); // Przechowuj wszystkie ID jako string
+        
+        return `<label style="display: flex; align-items: center; gap: 5px; margin-bottom: 5px; cursor: pointer; padding: 4px; border-radius: 3px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+            <input type="checkbox" class="media-group-checkbox" value="${groupIdsStr}" style="cursor: pointer;">
+            <span style="font-size: 11px;">${group.name}<span style="color: #888; font-size: 9px;">${sceneLabel}</span></span>
+        </label>`;
+    }).join('');
 }
 
 async function loadMediaFiles() {
@@ -1040,6 +1067,9 @@ function selectMediaFile(path, name, duration) {
 }
 
 function openAssignMediaModal() {
+    document.getElementById('sceneMedia').checked = false;
+    document.getElementById('sceneReportaze').checked = false;
+    document.getElementById('sceneError').style.display = 'none';
     document.getElementById('assignMediaModal').classList.add('active');
 }
 
@@ -1054,56 +1084,112 @@ async function assignMedia() {
         return;
     }
 
+    // Walidacja scen
+    const mediaChecked = document.getElementById('sceneMedia').checked;
+    const reportazeChecked = document.getElementById('sceneReportaze').checked;
+    
+    if (!mediaChecked && !reportazeChecked) {
+        document.getElementById('sceneError').style.display = 'block';
+        return;
+    }
+    
     const filePath = document.getElementById('mediaFilePath').value;
     const staffId = document.getElementById('mediaStaff').value;
-    const groupId = document.getElementById('mediaGroupSelect').value;
     
-    const data = {
-        scene_id: parseInt(document.getElementById('mediaSource').value),
+    // Zbierz zaznaczone grupy - wartość może być pojedynczym ID lub listą ID oddzieloną przecinkami
+    const selectedGroupIds = Array.from(document.querySelectorAll('.media-group-checkbox:checked'))
+        .flatMap(cb => {
+            // Wartość może być "123" lub "123,456"
+            return cb.value.split(',').map(id => parseInt(id.trim()));
+        })
+        .filter(id => !isNaN(id)); // Usuń nieprawidłowe wartości
+    
+    const modal = document.getElementById('assignMediaModal');
+    const isEditMode = modal.dataset.editMode === 'true';
+    const originalFilePath = modal.dataset.originalFilePath;
+    
+    const baseData = {
         title: document.getElementById('mediaTitle').value,
         description: document.getElementById('mediaDescription').value,
         file_path: filePath,
         duration: parseInt(document.getElementById('mediaFileDuration').value),
         episode_staff_id: staffId ? parseInt(staffId) : null,
-        order: 0 // Domyślna kolejność
+        order: 0
     };
 
     try {
-        const response = await fetch(`/api/episodes/${currentEpisodeId}/media`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        });
-
-        if (response.ok) {
-            const newMedia = await response.json();
+        if (isEditMode) {
+            // Edycja - usuń stare wpisy, dodaj nowe
+            const oldMediaItems = assignedMedia.filter(m => m.file_path === originalFilePath);
             
-            // Jeśli wybrano grupę, dodaj media do grupy
-            if (groupId) {
-                try {
-                    await fetch(`/api/media-groups/${groupId}/items`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            episode_media_id: newMedia.id,
-                            order: 0
-                        })
-                    });
-                } catch (error) {
-                    console.error('Błąd dodawania do grupy:', error);
-                    // Nie przerywamy - media zostało przypisane, tylko nie dodane do grupy
+            for (const item of oldMediaItems) {
+                await fetch(`/api/episodes/${currentEpisodeId}/media/${item.id}`, {
+                    method: 'DELETE'
+                });
+            }
+        }
+        
+        const selectedScenes = [];
+        if (mediaChecked) selectedScenes.push({name: 'MEDIA', id: mediaSceneId});
+        if (reportazeChecked) selectedScenes.push({name: 'REPORTAZE', id: reportazeSceneId});
+        
+        const createdMediaIds = []; // Zbieramy ID utworzonych mediów
+        
+        // Utwórz wpis dla każdej wybranej sceny
+        for (const scene of selectedScenes) {
+            const data = { ...baseData, scene_id: scene.id };
+            
+            const response = await fetch(`/api/episodes/${currentEpisodeId}/media`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                const newMedia = await response.json();
+                createdMediaIds.push(newMedia.id);
+            } else if (response.status === 409) {
+                alert(`Ten plik jest już przypisany do sceny ${scene.name} w tym odcinku`);
+                return;
+            } else {
+                const error = await response.text();
+                alert('Błąd przypisywania media: ' + error);
+                return;
+            }
+        }
+        
+        // Dodaj wszystkie utworzone media do wybranych grup (tylko raz)
+        if (selectedGroupIds.length > 0 && createdMediaIds.length > 0) {
+            for (const groupId of selectedGroupIds) {
+                for (const mediaId of createdMediaIds) {
+                    try {
+                        const response = await fetch(`/api/media-groups/${groupId}/items`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                episode_media_id: mediaId,
+                                order: 0
+                            })
+                        });
+                        
+                        // Ignoruj błąd 409 (Conflict) - media już jest w grupie
+                        if (!response.ok && response.status !== 409) {
+                            console.error('Błąd dodawania do grupy:', await response.text());
+                        }
+                    } catch (error) {
+                        console.error('Błąd dodawania do grupy:', error);
+                    }
                 }
             }
-            
-            closeAssignMediaModal();
-            await loadAssignedMedia();
-        } else if (response.status === 409) {
-            // Konflikt - plik już przypisany
-            alert('Ten plik jest już przypisany do tego odcinka');
-        } else {
-            const error = await response.text();
-            alert('Błąd przypisywania media: ' + error);
         }
+        
+        // Wyczyść tryb edycji
+        delete modal.dataset.editMode;
+        delete modal.dataset.originalFilePath;
+        
+        closeAssignMediaModal();
+        await loadAssignedMedia();
+        await loadMediaFiles(); // Odśwież listę plików
     } catch (error) {
         console.error('Błąd:', error);
         alert('Błąd połączenia');
@@ -1123,45 +1209,150 @@ async function loadAssignedMedia() {
 }
 
 function renderAssignedMedia() {
-    const container = document.getElementById('assignedMediaList');
+    const containerMedia = document.getElementById('assignedMediaListMedia');
+    const containerReportaze = document.getElementById('assignedMediaListReportaze');
     
     if (assignedMedia.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">Brak przypisanych mediów</div>';
+        containerMedia.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak mediów MEDIA</div>';
+        containerReportaze.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak mediów REPORTAŻE</div>';
         return;
     }
 
-    // Sortuj po order
-    assignedMedia.sort((a, b) => a.order - b.order);
-
-    container.innerHTML = assignedMedia.map(media => {
-        const sceneName = media.scene ? media.scene.name : 'Brak';
-        const authorName = media.episode_staff && media.episode_staff.staff ? 
-            `${media.episode_staff.staff.first_name} ${media.episode_staff.staff.last_name}` : 
+    // Grupuj media po file_path i scenie
+    const mediaByFileAndScene = {};
+    assignedMedia.forEach(m => {
+        const sceneName = m.scene ? m.scene.name : 'UNKNOWN';
+        const key = `${m.file_path}_${sceneName}`;
+        
+        if (!mediaByFileAndScene[key]) {
+            mediaByFileAndScene[key] = {
+                title: m.title,
+                file_path: m.file_path,
+                description: m.description,
+                duration: m.duration,
+                author: m.episode_staff,
+                scene: m.scene,
+                mediaItems: []
+            };
+        }
+        mediaByFileAndScene[key].mediaItems.push(m);
+    });
+    
+    const groupedMedia = Object.values(mediaByFileAndScene);
+    
+    // Rozdziel na MEDIA i REPORTAZE
+    const mediaItems_MEDIA = groupedMedia.filter(m => m.scene?.name === 'MEDIA');
+    const mediaItems_REPORTAZE = groupedMedia.filter(m => m.scene?.name === 'REPORTAZE');
+    
+    // Funkcja renderująca pojedynczy element
+    const renderMediaItem = (media) => {
+        const authorName = media.author && media.author.staff ? 
+            `${media.author.staff.first_name} ${media.author.staff.last_name}` : 
             'Brak';
-        const currentBadge = media.is_current ? 
+        
+        // Sprawdź czy któryś z wpisów jest current
+        const hasCurrent = media.mediaItems.some(m => m.is_current);
+        const currentBadge = hasCurrent ? 
             '<span class="badge badge-success">WCZYTANY</span>' : '';
         
         return `
-            <div class="assigned-media-item" data-media-id="${media.id}">
+            <div class="assigned-media-item" onclick="editMediaAssignment('${media.file_path}')">
                 <div class="media-item-details">
                     <div class="media-item-title">${media.title} ${currentBadge}</div>
                     <div class="media-item-meta">
-                        Scena: ${sceneName}<br>
                         Autor: ${authorName}<br>
                         ${media.description ? `Opis: ${media.description}<br>` : ''}
-                        Plik: ${media.file_path || media.url || 'Brak'}<br>
+                        Plik: ${media.file_path || 'Brak'}<br>
                         ${media.duration ? `Czas: ${formatDuration(media.duration)}<br>` : ''}
                     </div>
                 </div>
-                <div class="list-item-actions">
-                    <button class="btn btn-danger btn-icon" onclick="removeMediaFromEpisode(${media.id})">×</button>
+                <div class="list-item-actions" style="pointer-events: auto;">
+                    <button class="btn btn-primary btn-icon" onclick="event.stopPropagation(); editMediaAssignment('${media.file_path}')" title="Edytuj">✎</button>
+                    <button class="btn btn-danger btn-icon" onclick="event.stopPropagation(); removeMediaFile('${media.file_path}')" title="Usuń">×</button>
                 </div>
             </div>
         `;
-    }).join('');
+    };
     
-    // Inicjalizuj Sortable dla drag & drop
-    initAssignedMediaSortable();
+    // Renderuj MEDIA
+    if (mediaItems_MEDIA.length === 0) {
+        containerMedia.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak mediów MEDIA</div>';
+    } else {
+        containerMedia.innerHTML = mediaItems_MEDIA.map(renderMediaItem).join('');
+    }
+    
+    // Renderuj REPORTAZE
+    if (mediaItems_REPORTAZE.length === 0) {
+        containerReportaze.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak mediów REPORTAŻE</div>';
+    } else {
+        containerReportaze.innerHTML = mediaItems_REPORTAZE.map(renderMediaItem).join('');
+    }
+}
+//            </div>
+//       `;
+//    }).join('');
+//}
+
+function editMediaAssignment(filePath) {
+    // Znajdź wszystkie media z tym plikiem
+    const mediaItems = assignedMedia.filter(m => m.file_path === filePath);
+    if (mediaItems.length === 0) return;
+
+    const first = mediaItems[0];
+    
+    // Wypełnij formularz
+    document.getElementById('mediaFilePath').value = filePath;
+    document.getElementById('mediaFileDuration').value = first.duration || 0;
+    document.getElementById('mediaFileName').textContent = filePath.split('/').pop();
+    document.getElementById('mediaTitle').value = first.title;
+    document.getElementById('mediaDescription').value = first.description || '';
+    document.getElementById('mediaStaff').value = first.episode_staff_id || '';
+    
+    // Zaznacz sceny
+    document.getElementById('sceneMedia').checked = mediaItems.some(m => m.scene?.name === 'MEDIA');
+    document.getElementById('sceneReportaze').checked = mediaItems.some(m => m.scene?.name === 'REPORTAZE');
+    document.getElementById('sceneError').style.display = 'none';
+    
+    // Zapisz oryginalne file_path jako identyfikator edycji
+    document.getElementById('assignMediaModal').dataset.editMode = 'true';
+    document.getElementById('assignMediaModal').dataset.originalFilePath = filePath;
+    
+    // Najpierw wygeneruj checkboxy grup
+    updateMediaGroupSelect();
+    
+    // Następnie zaznacz grupy, do których należą te media
+    // Pobierz ID wszystkich media dla tego pliku
+    const mediaIds = mediaItems.map(m => m.id);
+    
+    // Przeszukaj wszystkie grupy i zaznacz te, które zawierają którekolwiek z tych media
+    setTimeout(() => {
+        mediaGroups.forEach(group => {
+            // Sprawdź czy grupa zawiera którekolwiek z tych media
+            // (To jest uproszczenie - w pełnej implementacji trzeba by sprawdzić media_group_items)
+            // Na razie zostawiamy niezaznaczone, bo przy edycji nie zachowujemy grup
+        });
+    }, 100);
+    
+    document.getElementById('assignMediaModal').classList.add('active');
+}
+
+async function removeMediaFile(filePath) {
+    if (!confirm('Czy na pewno usunąć to media ze wszystkich scen?')) return;
+
+    try {
+        const mediaItems = assignedMedia.filter(m => m.file_path === filePath);
+        
+        for (const item of mediaItems) {
+            await fetch(`/api/episodes/${currentEpisodeId}/media/${item.id}`, {
+                method: 'DELETE'
+            });
+        }
+        
+        await loadAssignedMedia();
+    } catch (error) {
+        console.error('Błąd:', error);
+        alert('Błąd usuwania');
+    }
 }
 
 async function removeMediaFromEpisode(mediaId) {
@@ -1204,36 +1395,69 @@ async function loadMediaGroups() {
 }
 
 function renderMediaGroups() {
-    const container = document.getElementById('mediaGroupsList');
+    const containerMedia = document.getElementById('mediaGroupsListMedia');
+    const containerReportaze = document.getElementById('mediaGroupsListReportaze');
     
     if (mediaGroups.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">Brak grup mediów</div>';
+        containerMedia.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak grup MEDIA</div>';
+        containerReportaze.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak grup REPORTAŻE</div>';
         return;
     }
 
-    container.innerHTML = mediaGroups.map(group => {
-        const isActive = group.is_current || false;
-        const activeClass = isActive ? 'active' : '';
-        
-        return `
-            <div class="media-group-card ${activeClass}" data-group-id="${group.id}" onclick="openManageMediaGroupModal(${group.id})">
-                <div class="media-group-header">
-                    <div>
-                        <div class="media-group-name">${group.name}</div>
-                        <div class="media-group-count">${group.description || 'Brak opisu'}</div>
+    // Rozdziel grupy według scen
+    const mediaGroups_MEDIA = mediaGroups.filter(g => g.scene && g.scene.name === 'MEDIA');
+    const mediaGroups_REPORTAZE = mediaGroups.filter(g => g.scene && g.scene.name === 'REPORTAZE');
+
+    // Renderuj grupy MEDIA
+    if (mediaGroups_MEDIA.length === 0) {
+        containerMedia.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak grup MEDIA</div>';
+    } else {
+        containerMedia.innerHTML = mediaGroups_MEDIA.map(group => {
+            const isActive = group.is_current || false;
+            const activeClass = isActive ? 'active' : '';
+            
+            return `
+                <div class="media-group-card ${activeClass}" data-group-id="${group.id}" onclick="openManageMediaGroupModal(${group.id})">
+                    <div class="media-group-header">
+                        <div>
+                            <div class="media-group-name">${group.name}</div>
+                            <div class="media-group-count">${group.description || 'Brak opisu'}</div>
+                        </div>
+                        ${isActive ? '<span class="badge badge-success">AKTYWNA</span>' : ''}
                     </div>
-                    ${isActive ? '<span class="badge badge-success">AKTYWNA</span>' : ''}
                 </div>
-            </div>
-        `;
-    }).join('');
-    
-    // Inicjalizuj Sortable dla drag & drop
-    initMediaGroupsSortable();
+            `;
+        }).join('');
+    }
+
+    // Renderuj grupy REPORTAZE
+    if (mediaGroups_REPORTAZE.length === 0) {
+        containerReportaze.innerHTML = '<div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">Brak grup REPORTAŻE</div>';
+    } else {
+        containerReportaze.innerHTML = mediaGroups_REPORTAZE.map(group => {
+            const isActive = group.is_current || false;
+            const activeClass = isActive ? 'active' : '';
+            
+            return `
+                <div class="media-group-card ${activeClass}" data-group-id="${group.id}" onclick="openManageMediaGroupModal(${group.id})">
+                    <div class="media-group-header">
+                        <div>
+                            <div class="media-group-name">${group.name}</div>
+                            <div class="media-group-count">${group.description || 'Brak opisu'}</div>
+                        </div>
+                        ${isActive ? '<span class="badge badge-success">AKTYWNA</span>' : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
 }
 
 function openAddMediaGroupModal() {
     document.getElementById('addMediaGroupForm').reset();
+    document.getElementById('groupSceneMedia').checked = false;
+    document.getElementById('groupSceneReportaze').checked = false;
+    document.getElementById('groupSceneError').style.display = 'none';
     document.getElementById('addMediaGroupModal').classList.add('active');
 }
 
@@ -1247,26 +1471,44 @@ async function createMediaGroup() {
         return;
     }
 
-    const data = {
-        episode_id: currentEpisodeId,
-        name: document.getElementById('mediaGroupName').value,
-        description: document.getElementById('mediaGroupDescription').value
-    };
+    // Walidacja scen
+    const mediaChecked = document.getElementById('groupSceneMedia').checked;
+    const reportazeChecked = document.getElementById('groupSceneReportaze').checked;
+    
+    if (!mediaChecked && !reportazeChecked) {
+        document.getElementById('groupSceneError').style.display = 'block';
+        return;
+    }
 
+    // Utwórz grupę dla każdej wybranej sceny
     try {
-        const response = await fetch('/api/media-groups', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
-        });
+        const selectedScenes = [];
+        if (mediaChecked) selectedScenes.push({name: 'MEDIA', id: mediaSceneId});
+        if (reportazeChecked) selectedScenes.push({name: 'REPORTAZE', id: reportazeSceneId});
+        
+        for (const scene of selectedScenes) {
+            const data = {
+                episode_id: currentEpisodeId,
+                scene_id: scene.id,
+                name: document.getElementById('mediaGroupName').value + (selectedScenes.length > 1 ? ` (${scene.name})` : ''),
+                description: document.getElementById('mediaGroupDescription').value
+            };
+            
+            const response = await fetch('/api/media-groups', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
 
-        if (response.ok) {
-            closeAddMediaGroupModal();
-            await loadMediaGroups();
-        } else {
-            const error = await response.text();
-            alert('Błąd dodawania grupy: ' + error);
+            if (!response.ok) {
+                const error = await response.text();
+                alert('Błąd dodawania grupy: ' + error);
+                return;
+            }
         }
+        
+        closeAddMediaGroupModal();
+        await loadMediaGroups();
     } catch (error) {
         console.error('Błąd:', error);
         alert('Błąd połączenia');
@@ -1281,6 +1523,20 @@ async function openManageMediaGroupModal(groupId) {
     document.getElementById('manageMediaGroupTitle').textContent = currentMediaGroup.name;
     document.getElementById('mediaGroupInfo').textContent = currentMediaGroup.description || 'Brak opisu';
 
+    // Sprawdź czy istnieją grupy o tej samej nazwie w innych scenach
+    const sceneName = currentMediaGroup.scene ? currentMediaGroup.scene.name : '';
+    const sameNameGroups = mediaGroups.filter(g => 
+        g.name === currentMediaGroup.name && 
+        g.episode_id === currentMediaGroup.episode_id
+    );
+    
+    // Zaznacz checkboxy dla wszystkich scen gdzie istnieje ta grupa
+    let hasMedia = sameNameGroups.some(g => g.scene?.name === 'MEDIA');
+    let hasReportaze = sameNameGroups.some(g => g.scene?.name === 'REPORTAZE');
+    
+    document.getElementById('manageGroupSceneMedia').checked = hasMedia;
+    document.getElementById('manageGroupSceneReportaze').checked = hasReportaze;
+
     // Załaduj media w grupie
     await loadGroupMediaItems(groupId);
 
@@ -1290,6 +1546,148 @@ async function openManageMediaGroupModal(groupId) {
 function closeManageMediaGroupModal() {
     document.getElementById('manageMediaGroupModal').classList.remove('active');
     currentMediaGroup = null;
+}
+
+async function updateGroupScenes() {
+    const groupId = parseInt(document.getElementById('currentMediaGroupId').value);
+    if (!groupId || !currentMediaGroup) return;
+    
+    const mediaChecked = document.getElementById('manageGroupSceneMedia').checked;
+    const reportazeChecked = document.getElementById('manageGroupSceneReportaze').checked;
+    
+    // Wymaga przynajmniej jednej sceny
+    if (!mediaChecked && !reportazeChecked) {
+        alert('Grupa musi być przypisana do przynajmniej jednej sceny');
+        // Przywróć poprzedni stan
+        const currentSceneName = currentMediaGroup.scene ? currentMediaGroup.scene.name : '';
+        document.getElementById('manageGroupSceneMedia').checked = (currentSceneName === 'MEDIA');
+        document.getElementById('manageGroupSceneReportaze').checked = (currentSceneName === 'REPORTAZE');
+        return;
+    }
+    
+    const currentSceneName = currentMediaGroup.scene ? currentMediaGroup.scene.name : '';
+    const currentSceneWasMedia = (currentSceneName === 'MEDIA');
+    const currentSceneWasReportaze = (currentSceneName === 'REPORTAZE');
+    
+    // Sprawdź co się zmieniło
+    const nowWantsMedia = mediaChecked;
+    const nowWantsReportaze = reportazeChecked;
+    
+    // Jeśli nic się nie zmieniło, wyjdź
+    if (currentSceneWasMedia === nowWantsMedia && currentSceneWasReportaze === nowWantsReportaze) {
+        return;
+    }
+    
+    try {
+        // Znajdź wszystkie grupy o tej samej nazwie w tym odcinku
+        const sameNameGroups = mediaGroups.filter(g => 
+            g.name === currentMediaGroup.name && 
+            g.episode_id === currentMediaGroup.episode_id
+        );
+        
+        const existingMediaGroup = sameNameGroups.find(g => g.scene?.name === 'MEDIA');
+        const existingReportazeGroup = sameNameGroups.find(g => g.scene?.name === 'REPORTAZE');
+        
+        // Przypadek 1: Chcemy dodać MEDIA (nie było wcześniej)
+        if (nowWantsMedia && !existingMediaGroup) {
+            const mediaScene = window.mediaScenes.find(s => s.name === 'MEDIA');
+            if (mediaScene) {
+                const response = await fetch('/api/media-groups', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        episode_id: currentMediaGroup.episode_id,
+                        scene_id: mediaScene.id,
+                        name: currentMediaGroup.name,
+                        description: currentMediaGroup.description
+                    })
+                });
+                
+                if (!response.ok) {
+                    alert('Błąd tworzenia grupy MEDIA');
+                    document.getElementById('manageGroupSceneMedia').checked = false;
+                    return;
+                }
+            }
+        }
+        
+        // Przypadek 2: Chcemy dodać REPORTAZE (nie było wcześniej)
+        if (nowWantsReportaze && !existingReportazeGroup) {
+            const reportazeScene = window.mediaScenes.find(s => s.name === 'REPORTAZE');
+            if (reportazeScene) {
+                const response = await fetch('/api/media-groups', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        episode_id: currentMediaGroup.episode_id,
+                        scene_id: reportazeScene.id,
+                        name: currentMediaGroup.name,
+                        description: currentMediaGroup.description
+                    })
+                });
+                
+                if (!response.ok) {
+                    alert('Błąd tworzenia grupy REPORTAZE');
+                    document.getElementById('manageGroupSceneReportaze').checked = false;
+                    return;
+                }
+            }
+        }
+        
+        // Przypadek 3: Chcemy usunąć MEDIA (było wcześniej)
+        if (!nowWantsMedia && existingMediaGroup) {
+            const response = await fetch(`/api/media-groups/${existingMediaGroup.id}`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                alert('Błąd usuwania grupy MEDIA');
+                document.getElementById('manageGroupSceneMedia').checked = true;
+                return;
+            }
+        }
+        
+        // Przypadek 4: Chcemy usunąć REPORTAZE (było wcześniej)
+        if (!nowWantsReportaze && existingReportazeGroup) {
+            const response = await fetch(`/api/media-groups/${existingReportazeGroup.id}`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                alert('Błąd usuwania grupy REPORTAZE');
+                document.getElementById('manageGroupSceneReportaze').checked = true;
+                return;
+            }
+        }
+        
+        // Odśwież listę grup
+        await loadMediaGroups();
+        
+        // Zamknij modal tylko jeśli odznaczono bieżącą scenę
+        if ((currentSceneWasMedia && !nowWantsMedia) || (currentSceneWasReportaze && !nowWantsReportaze)) {
+            // Sprawdź czy pozostała jakaś scena
+            if (!nowWantsMedia && !nowWantsReportaze) {
+                closeManageMediaGroupModal();
+            } else {
+                // Jeśli pozostała inna scena, zaktualizuj currentMediaGroup
+                const remainingGroups = mediaGroups.filter(g => 
+                    g.name === currentMediaGroup.name && 
+                    g.episode_id === currentMediaGroup.episode_id
+                );
+                if (remainingGroups.length > 0) {
+                    currentMediaGroup = remainingGroups[0];
+                    document.getElementById('currentMediaGroupId').value = currentMediaGroup.id;
+                }
+            }
+        }
+        
+    } catch (error) {
+        console.error('Błąd:', error);
+        alert('Błąd połączenia');
+        // Przywróć poprzedni stan checkboxów
+        document.getElementById('manageGroupSceneMedia').checked = currentSceneWasMedia;
+        document.getElementById('manageGroupSceneReportaze').checked = currentSceneWasReportaze;
+    }
 }
 
 async function loadGroupMediaItems(groupId) {
@@ -1496,19 +1894,29 @@ function initGroupMediaItemsSortable() {
         ghostClass: 'sortable-ghost',
         dragClass: 'sortable-drag',
         onEnd: async function(evt) {
-            const itemId = evt.item.dataset.itemId;
+            const itemId = parseInt(evt.item.getAttribute('data-item-id'));
             const newOrder = evt.newIndex;
             
+            if (!itemId) {
+                console.error('Brak itemId');
+                return;
+            }
+            
             try {
-                await fetch(`/api/media-groups/${groupId}/items/${itemId}/reorder`, {
+                const response = await fetch(`/api/media-groups/${groupId}/items/${itemId}/reorder`, {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ order: newOrder })
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+                }
+                
                 await loadGroupMediaItems(groupId);
             } catch (error) {
                 console.error('Błąd aktualizacji kolejności:', error);
-                alert('Błąd aktualizacji kolejności');
+                alert('Błąd aktualizacji kolejności: ' + error.message);
             }
         }
     });

@@ -29,6 +29,20 @@
         </div>
 
         <div class="scenes-grid">
+            <!-- Panel sterowania OBS -->
+            <div class="obs-control-panel">
+                <h3>Sterowanie OBS</h3>
+                <div class="obs-controls">
+                    <button class="obs-btn" onclick="obsStartStreaming()">▶️ Start Stream</button>
+                    <button class="obs-btn" onclick="obsStopStreaming()">⏹️ Stop Stream</button>
+                    <button class="obs-btn" onclick="obsStartRecording()">🔴 Start Nagrywanie</button>
+                    <button class="obs-btn" onclick="obsStopRecording()">⏹️ Stop Nagrywanie</button>
+                    <button class="obs-btn" onclick="obsToggleStudioMode()">🎬 Studio Mode</button>
+                    <button class="obs-btn" onclick="obsTransition()">🔀 Transition</button>
+                </div>
+            </div>
+
+            <!-- Panel KAMERY -->
             <div class="scene-panel" data-scene="KAMERY">
                 <h3>Kamery</h3>
                 <div class="sources-list" id="sources-kamery">
@@ -37,36 +51,48 @@
                 <button class="save-order-btn" id="save-kamery" onclick="saveSourceOrder('KAMERY')">💾 Zapisz</button>
             </div>
 
-            <div class="scene-panel" data-scene="MEDIA">
-                <h3>Media</h3>
-                <div class="sources-list" id="sources-media">
-                    <div class="loading">Ładowanie...</div>
+            <!-- Panel z zakładkami MEDIA/REPORTAŻE -->
+            <div class="scene-panel-tabbed">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="media" onclick="switchTab('media-reportaze', 'media')">Media</button>
+                    <button class="tab-btn" data-tab="reportaze" onclick="switchTab('media-reportaze', 'reportaze')">Reportaże</button>
                 </div>
-                <button class="save-order-btn" id="save-media" onclick="saveSourceOrder('MEDIA')">💾 Zapisz</button>
+                
+                <div class="tab-content active" id="tab-media" data-scene="MEDIA">
+                    <div class="sources-list" id="sources-media">
+                        <div class="loading">Ładowanie...</div>
+                    </div>
+                    <button class="save-order-btn" id="save-media" onclick="saveSourceOrder('MEDIA')">💾 Zapisz</button>
+                </div>
+                
+                <div class="tab-content" id="tab-reportaze" data-scene="REPORTAZE">
+                    <div class="sources-list" id="sources-reportaze">
+                        <div class="loading">Ładowanie...</div>
+                    </div>
+                    <button class="save-order-btn" id="save-reportaze" onclick="saveSourceOrder('REPORTAZE')">💾 Zapisz</button>
+                </div>
             </div>
 
-            <div class="scene-panel" data-scene="REPORTAZE">
-                <h3>Reportaże</h3>
-                <div class="sources-list" id="sources-reportaze">
-                    <div class="loading">Ładowanie...</div>
+            <!-- Panel z zakładkami MIKROFONY/MUZYKA -->
+            <div class="scene-panel-tabbed">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="mikrofony" onclick="switchTab('mikrofony-muzyka', 'mikrofony')">Mikrofony</button>
+                    <button class="tab-btn" data-tab="muzyka" onclick="switchTab('mikrofony-muzyka', 'muzyka')">Muzyka</button>
                 </div>
-                <button class="save-order-btn" id="save-reportaze" onclick="saveSourceOrder('REPORTAZE')">💾 Zapisz</button>
-            </div>
-
-            <div class="scene-panel" data-scene="MIKROFONY">
-                <h3>Mikrofony</h3>
-                <div class="sources-list" id="sources-mikrofony">
-                    <div class="loading">Ładowanie...</div>
+                
+                <div class="tab-content active" id="tab-mikrofony" data-scene="MIKROFONY">
+                    <div class="sources-list" id="sources-mikrofony">
+                        <div class="loading">Ładowanie...</div>
+                    </div>
+                    <button class="save-order-btn" id="save-mikrofony" onclick="saveSourceOrder('MIKROFONY')">💾 Zapisz</button>
                 </div>
-                <button class="save-order-btn" id="save-mikrofony" onclick="saveSourceOrder('MIKROFONY')">💾 Zapisz</button>
-            </div>
-
-            <div class="scene-panel" data-scene="MUZYKA">
-                <h3>Muzyka</h3>
-                <div class="sources-list" id="sources-muzyka">
-                    <div class="loading">Ładowanie...</div>
+                
+                <div class="tab-content" id="tab-muzyka" data-scene="MUZYKA">
+                    <div class="sources-list" id="sources-muzyka">
+                        <div class="loading">Ładowanie...</div>
+                    </div>
+                    <button class="save-order-btn" id="save-muzyka" onclick="saveSourceOrder('MUZYKA')">💾 Zapisz</button>
                 </div>
-                <button class="save-order-btn" id="save-muzyka" onclick="saveSourceOrder('MUZYKA')">💾 Zapisz</button>
             </div>
         </div>
     </div>

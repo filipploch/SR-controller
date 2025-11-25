@@ -111,6 +111,8 @@ type MediaGroup struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	EpisodeID   uint      `gorm:"index;not null" json:"episode_id"`    // Przypisanie do odcinka
 	Episode     Episode   `gorm:"foreignKey:EpisodeID" json:"episode"` // Relacja do odcinka
+	SceneID     uint      `gorm:"index;not null" json:"scene_id"`      // Przypisanie do sceny (MEDIA lub REPORTAZE)
+	Scene       Scene     `gorm:"foreignKey:SceneID" json:"scene"`     // Relacja do sceny
 	Name        string    `gorm:"size:200;not null" json:"name"`
 	Description string    `gorm:"type:text" json:"description"`
 	Order       int       `gorm:"not null" json:"order"`                 // Kolejność w odcinku (unique per episode)
@@ -372,10 +374,10 @@ func SetCurrentMediaGroup(db *gorm.DB, episodeID uint, groupID uint) error {
 	})
 }
 
-// GetNextEpisodeMediaOrder zwraca następny dostępny numer kolejności dla media w odcinku
-func GetNextEpisodeMediaOrder(db *gorm.DB, episodeID uint) int {
+// GetNextEpisodeMediaOrder zwraca następny dostępny numer kolejności dla media w odcinku i scenie
+func GetNextEpisodeMediaOrder(db *gorm.DB, episodeID uint, sceneID uint) int {
 	var maxMedia EpisodeMedia
-	result := db.Where("episode_id = ?", episodeID).Order("\"order\" DESC").First(&maxMedia)
+	result := db.Where("episode_id = ? AND scene_id = ?", episodeID, sceneID).Order("\"order\" DESC").First(&maxMedia)
 	if result.Error != nil {
 		return 0
 	}

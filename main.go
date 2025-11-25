@@ -71,7 +71,7 @@ func main() {
 	// Ścieżka do mediów
 	mediaPath := "./media"
 	os.MkdirAll(mediaPath, 0755)
-	episodeMediaHandler := handlers.NewEpisodeMediaHandler(db, mediaPath)
+	episodeMediaHandler := handlers.NewEpisodeMediaHandler(db, mediaPath, obsClient)
 
 	// Routing
 	router := mux.NewRouter()
@@ -191,6 +191,7 @@ func main() {
 	api.HandleFunc("/episodes/{episode_id}/media/{id}/reorder", episodeMediaHandler.ReorderEpisodeMedia).Methods("PUT")
 	api.HandleFunc("/episodes/{episode_id}/media/upload", episodeMediaHandler.UploadMedia).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/media/files", episodeMediaHandler.ListMediaFiles).Methods("GET")
+	api.HandleFunc("/episodes/current/media/scene/{scene_name}", episodeMediaHandler.GetCurrentMediaForScene).Methods("GET")
 
 	// API REST dla Scenes
 	api.HandleFunc("/scenes", sceneHandler.GetScenes).Methods("GET")
@@ -209,7 +210,6 @@ func main() {
 	api.HandleFunc("/media-groups/{id}/items", mediaGroupHandler.AddItemToGroup).Methods("POST")
 	api.HandleFunc("/media-groups/{id}/reorder", mediaGroupHandler.ReorderMediaGroup).Methods("PUT")
 	api.HandleFunc("/media-groups/{group_id}/items/{id}/reorder", mediaGroupHandler.ReorderMediaGroupItem).Methods("PUT")
-	api.HandleFunc("/media-groups/{group_id}/media/{media_id}", mediaGroupHandler.AddMediaToGroup).Methods("POST")
 	api.HandleFunc("/media-groups/{group_id}/media/{media_id}", mediaGroupHandler.RemoveMediaFromGroup).Methods("DELETE")
 	api.HandleFunc("/episodes/{episode_id}/media-groups/{group_id}/set-current", mediaGroupHandler.SetCurrentMediaGroup).Methods("POST")
 

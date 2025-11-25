@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"obs-controller/models"
+	"obs-controller/obsws"
 	"obs-controller/utils"
 	"os"
 	"path/filepath"
@@ -17,13 +18,15 @@ import (
 
 type EpisodeMediaHandler struct {
 	DB        *gorm.DB
-	MediaPath string // Ścieżka bazowa do mediów
+	MediaPath string        // Ścieżka bazowa do mediów
+	OBSClient *obsws.Client // Klient OBS-WebSocket
 }
 
-func NewEpisodeMediaHandler(db *gorm.DB, mediaPath string) *EpisodeMediaHandler {
+func NewEpisodeMediaHandler(db *gorm.DB, mediaPath string, obsClient *obsws.Client) *EpisodeMediaHandler {
 	return &EpisodeMediaHandler{
 		DB:        db,
 		MediaPath: mediaPath,
+		OBSClient: obsClient,
 	}
 }
 
@@ -71,25 +74,26 @@ func (h *EpisodeMediaHandler) CreateEpisodeMedia(w http.ResponseWriter, r *http.
 
 	media.EpisodeID = uint(episodeID)
 
-	// Sprawdź czy ten sam plik nie jest już przypisany do tego odcinka
+	// Sprawdź czy ten sam plik nie jest już przypisany do tego odcinka I tej sceny
 	if media.FilePath != nil && *media.FilePath != "" {
 		var existingMedia models.EpisodeMedia
-		result := h.DB.Where("episode_id = ? AND file_path = ?", episodeID, *media.FilePath).First(&existingMedia)
+		result := h.DB.Where("episode_id = ? AND scene_id = ? AND file_path = ?", episodeID, media.SceneID, *media.FilePath).First(&existingMedia)
 		if result.Error == nil {
-			// Znaleziono duplikat
-			http.Error(w, "Ten plik jest już przypisany do tego odcinka", http.StatusConflict)
+			// Znaleziono duplikat - ten sam plik w tej samej scenie
+			http.Error(w, "Ten plik jest już przypisany do tej sceny w tym odcinku", http.StatusConflict)
 			return
 		}
 	}
 
 	// Automatycznie ustaw kolejność jeśli nie podano
 	if media.Order == 0 {
-		media.Order = models.GetNextEpisodeMediaOrder(h.DB, uint(episodeID))
+		media.Order = models.GetNextEpisodeMediaOrder(h.DB, uint(episodeID), media.SceneID)
 	}
 
 	// Jeśli podano FilePath, odczytaj duration
 	if media.FilePath != nil && *media.FilePath != "" {
-		fullPath := filepath.Join(h.MediaPath, *media.FilePath)
+		// Konwertuj ścieżkę z bazy (zawsze /) na format systemu operacyjnego
+		fullPath := filepath.Join(h.MediaPath, filepath.FromSlash(*media.FilePath))
 		if duration, err := utils.GetMediaDuration(fullPath); err == nil {
 			media.Duration = duration
 		}
@@ -152,7 +156,8 @@ func (h *EpisodeMediaHandler) UpdateEpisodeMedia(w http.ResponseWriter, r *http.
 
 	// Jeśli zmieniono FilePath, odczytaj nowy duration
 	if media.FilePath != nil && *media.FilePath != "" {
-		fullPath := filepath.Join(h.MediaPath, *media.FilePath)
+		// Konwertuj ścieżkę z bazy (zawsze /) na format systemu operacyjnego
+		fullPath := filepath.Join(h.MediaPath, filepath.FromSlash(*media.FilePath))
 		if duration, err := utils.GetMediaDuration(fullPath); err == nil {
 			media.Duration = duration
 		}
@@ -213,7 +218,7 @@ func (h *EpisodeMediaHandler) ReorderEpisodeMedia(w http.ResponseWriter, r *http
 		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
 		return
 	}
-	
+
 	mediaID, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
 		http.Error(w, "Invalid media ID", http.StatusBadRequest)
@@ -321,8 +326,8 @@ func (h *EpisodeMediaHandler) UploadMedia(w http.ResponseWriter, r *http.Request
 	// Odczytaj duration
 	duration, _ := utils.GetMediaDuration(targetPath)
 
-	// Względna ścieżka od folderu media
-	relativePath := filepath.Join(seasonFolder, handler.Filename)
+	// Względna ścieżka od folderu media - używamy / dla bazy danych
+	relativePath := seasonFolder + "/" + handler.Filename
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -364,8 +369,10 @@ func (h *EpisodeMediaHandler) ListMediaFiles(w http.ResponseWriter, r *http.Requ
 
 	for _, entry := range entries {
 		if !entry.IsDir() {
-			relativePath := filepath.Join(seasonFolder, entry.Name())
-			fullPath := filepath.Join(h.MediaPath, relativePath)
+			// Względna ścieżka - używamy / dla bazy danych
+			relativePath := seasonFolder + "/" + entry.Name()
+			// Konwertuj na format systemu operacyjnego dla dostępu do pliku
+			fullPath := filepath.Join(h.MediaPath, filepath.FromSlash(relativePath))
 
 			duration, _ := utils.GetMediaDuration(fullPath)
 
@@ -418,4 +425,116 @@ func (h *EpisodeMediaHandler) SetCurrentMedia(w http.ResponseWriter, r *http.Req
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// GetCurrentMediaForScene - GET /api/episodes/current/media/scene/{scene_name}
+// Pobiera aktualny plik media dla danej sceny z aktualnego odcinka i ustawia go w OBS
+func (h *EpisodeMediaHandler) GetCurrentMediaForScene(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	sceneName := vars["scene_name"]
+
+	// Pobierz aktualny odcinek
+	currentEpisode, err := models.GetCurrentEpisode(h.DB)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "No current episode",
+		})
+		return
+	}
+
+	// Pobierz scenę po nazwie
+	scene, err := models.GetMediaSceneByName(h.DB, sceneName)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Scene not found",
+		})
+		return
+	}
+
+	// Szukaj media z is_current=true dla tego odcinka i sceny
+	var currentMedia models.EpisodeMedia
+	result := h.DB.Where("episode_id = ? AND scene_id = ? AND is_current = ?",
+		currentEpisode.ID, scene.ID, true).First(&currentMedia)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		// Nie znaleziono media z is_current=true, szukaj z najniższym order
+		result = h.DB.Where("episode_id = ? AND scene_id = ?",
+			currentEpisode.ID, scene.ID).
+			Order("\"order\" ASC").
+			First(&currentMedia)
+
+		if result.Error == gorm.ErrRecordNotFound {
+			// Brak jakichkolwiek mediów dla tego odcinka i sceny
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   "No media found",
+			})
+			return
+		}
+
+		if result.Error != nil {
+			http.Error(w, result.Error.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Ustaw to media jako current
+		if err := models.SetCurrentEpisodeMedia(h.DB, currentEpisode.ID, currentMedia.ID); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		currentMedia.IsCurrent = true
+	}
+
+	if result.Error != nil {
+		http.Error(w, result.Error.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Jeśli mamy plik i OBS jest połączony, ustaw go w źródle
+	if currentMedia.FilePath != nil && *currentMedia.FilePath != "" && h.OBSClient != nil && h.OBSClient.IsConnected() {
+		// Pobierz bezwzględną ścieżkę do katalogu aplikacji
+		absMediaPath, err := filepath.Abs(h.MediaPath)
+		if err != nil {
+			absMediaPath = h.MediaPath
+		}
+
+		// Zbuduj pełną ścieżkę: C:/Users/.../media/season_1/file.mp4
+		fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*currentMedia.FilePath))
+
+		// Pobierz źródło z bazy dla tej sceny
+		// Szukamy pierwszego źródła typu "Media Source" w tej scenie
+		var source models.Source
+		result := h.DB.Where("scene_id = ?", scene.ID).
+			Order("source_order ASC").
+			First(&source)
+
+		if result.Error == nil && source.Name != "" {
+			// Ustaw ustawienia źródła w OBS
+			err = h.OBSClient.SetInputSettings(source.Name, map[string]interface{}{
+				"local_file":          fullPath,
+				"clear_on_media_end":  false,
+				"close_when_inactive": true,
+			})
+
+			if err != nil {
+				// Loguj błąd, ale nie przerywaj - zwróć dane mimo błędu OBS
+				fmt.Printf("Błąd ustawiania pliku w OBS: %v\n", err)
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"media_id":  currentMedia.ID,
+		"title":     currentMedia.Title,
+		"file_path": currentMedia.FilePath,
+		"url":       currentMedia.URL,
+		"duration":  currentMedia.Duration,
+	})
 }

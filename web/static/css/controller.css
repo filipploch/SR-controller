@@ -2,9 +2,134 @@
 
 .scenes-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: 2fr 1fr 1fr 1fr;
     gap: 8px;
     flex: 1;
+}
+
+/* Panel sterowania OBS */
+.obs-control-panel {
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    border: 2px solid rgba(255, 165, 0, 0.3);
+}
+
+.obs-control-panel h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-align: center;
+    color: #ffa500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.obs-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    flex: 1;
+}
+
+.obs-btn {
+    padding: 8px 6px;
+    font-size: 9px;
+    background: rgba(255, 165, 0, 0.15);
+    border: 1px solid rgba(255, 165, 0, 0.4);
+    border-radius: 4px;
+    color: #ffa500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.obs-btn:hover {
+    background: rgba(255, 165, 0, 0.3);
+    border-color: #ffa500;
+    transform: translateY(-1px);
+}
+
+.obs-btn:active {
+    transform: translateY(0);
+}
+
+/* Panele z zakładkami */
+.scene-panel-tabbed {
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.tab-buttons {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 4px 6px;
+    font-size: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: #888;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.tab-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.tab-btn.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.tab-content {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+.tab-content.active {
+    display: flex;
+}
+
+/* Kolory dla zakładek */
+.tab-btn.active[data-tab="media"] {
+    color: #ffa726;
+    border-color: rgba(255, 167, 38, 0.5);
+}
+
+.tab-btn.active[data-tab="reportaze"] {
+    color: #66bb6a;
+    border-color: rgba(102, 187, 106, 0.5);
+}
+
+.tab-btn.active[data-tab="mikrofony"] {
+    color: #ef5350;
+    border-color: rgba(239, 83, 80, 0.5);
+}
+
+.tab-btn.active[data-tab="muzyka"] {
+    color: #ab47bc;
+    border-color: rgba(171, 71, 188, 0.5);
 }
 
 .scene-panel {
@@ -89,7 +214,3 @@
 
 /* Kolory dla różnych scen */
 .scene-panel[data-scene="KAMERY"] h3 { color: #4fc3f7; }
-.scene-panel[data-scene="MEDIA"] h3 { color: #ffa726; }
-.scene-panel[data-scene="REPORTAZE"] h3 { color: #66bb6a; }
-.scene-panel[data-scene="MIKROFONY"] h3 { color: #ef5350; }
-.scene-panel[data-scene="MUZYKA"] h3 { color: #ab47bc; }

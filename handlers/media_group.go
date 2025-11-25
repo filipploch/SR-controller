@@ -21,7 +21,7 @@ func NewMediaGroupHandler(db *gorm.DB) *MediaGroupHandler {
 // GetMediaGroups - GET /api/media-groups
 func (h *MediaGroupHandler) GetMediaGroups(w http.ResponseWriter, r *http.Request) {
 	var groups []models.MediaGroup
-	query := h.DB.Order("\"order\" ASC")
+	query := h.DB.Preload("Scene").Order("\"order\" ASC")
 
 	// Filtruj po episode_id jeśli podano
 	if episodeID := r.URL.Query().Get("episode_id"); episodeID != "" {
@@ -114,6 +114,7 @@ func (h *MediaGroupHandler) UpdateMediaGroup(w http.ResponseWriter, r *http.Requ
 
 	group.Name = updateData.Name
 	group.Description = updateData.Description
+	group.SceneID = updateData.SceneID
 
 	if err := h.DB.Save(&group).Error; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -237,69 +238,6 @@ func (h *MediaGroupHandler) AddItemToGroup(w http.ResponseWriter, r *http.Reques
 }
 
 // AddMediaToGroup - POST /api/media-groups/{group_id}/media/{media_id}
-func (h *MediaGroupHandler) AddMediaToGroup(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	groupID, err := strconv.ParseUint(vars["group_id"], 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid group ID", http.StatusBadRequest)
-		return
-	}
-
-	mediaID, err := strconv.ParseUint(vars["media_id"], 10, 32)
-	if err != nil {
-		http.Error(w, "Invalid media ID", http.StatusBadRequest)
-		return
-	}
-
-	var data struct {
-		Order int `json:"order"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Sprawdź czy media istnieje
-	var media models.EpisodeMedia
-	if err := h.DB.First(&media, mediaID).Error; err != nil {
-		http.Error(w, "Media not found", http.StatusNotFound)
-		return
-	}
-
-	// Sprawdź czy grupa istnieje
-	var group models.MediaGroup
-	if err := h.DB.First(&group, groupID).Error; err != nil {
-		http.Error(w, "Group not found", http.StatusNotFound)
-		return
-	}
-
-	// Sprawdź czy już nie jest przypisane
-	var existing models.EpisodeMediaGroup
-	if err := h.DB.Where("episode_media_id = ? AND media_group_id = ?", mediaID, groupID).First(&existing).Error; err == nil {
-		http.Error(w, "Media already in group", http.StatusConflict)
-		return
-	}
-
-	assignment := models.EpisodeMediaGroup{
-		EpisodeMediaID: uint(mediaID),
-		MediaGroupID:   uint(groupID),
-		Order:          data.Order,
-		IsCurrent:      false,
-	}
-
-	if err := h.DB.Create(&assignment).Error; err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Załaduj relacje
-	h.DB.Preload("EpisodeMedia").Preload("MediaGroup").First(&assignment, assignment.ID)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(assignment)
-}
-
 // RemoveMediaFromGroup - DELETE /api/media-groups/{group_id}/media/{media_id}
 func (h *MediaGroupHandler) RemoveMediaFromGroup(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)

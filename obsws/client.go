@@ -307,6 +307,16 @@ func (c *Client) SetSceneItemIndexByValue(sceneName, sourceName string, index in
 	return err
 }
 
+// SetInputSettings ustawia ustawienia źródła wejściowego (np. plik dla Media Source)
+func (c *Client) SetInputSettings(inputName string, inputSettings map[string]interface{}) error {
+	_, err := c.Request("SetInputSettings", map[string]interface{}{
+		"inputName":     inputName,
+		"inputSettings": inputSettings,
+		"overlay":       false,
+	})
+	return err
+}
+
 // Close zamyka połączenie
 func (c *Client) Close() error {
 	c.mu.Lock()
