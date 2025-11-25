@@ -106,15 +106,11 @@ async function loadCurrentMediaButton(sceneName, sourceName) {
 			// Zaktualizuj tekst przycisku na tytuł z bazy
 			button.textContent = data.title;
 			
-			// Ustaw jako aktywny (ponieważ media jest załadowane)
-			button.classList.add('active');
-			
 			// Zapisz ID media w atrybucie data
 			button.dataset.mediaId = data.media_id;
 		} else {
 			// Brak media - przywróć oryginalną nazwę
 			button.textContent = sourceName;
-			button.classList.remove('active');
 			button.removeAttribute('data-media-id');
 		}
 	} catch (error) {

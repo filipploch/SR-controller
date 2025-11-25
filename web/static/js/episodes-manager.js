@@ -950,8 +950,6 @@ async function loadMediaScenes() {
         if (!response.ok) return;
         
         const scenes = await response.json();
-        // Nie zapisuj już do globalnych zmiennych mediaSceneId i reportazeSceneId
-        // Bo te nie są już potrzebne
         console.log('Sceny mediów:', scenes);
     } catch (error) {
         console.error('Błąd ładowania scen:', error);
@@ -1019,15 +1017,6 @@ function renderMediaFiles() {
     }).join('');
 }
 
-// function selectMediaFile(path, name, duration) {
-//     document.getElementById('mediaFilePath').value = path;
-//     document.getElementById('mediaFileDuration').value = duration || 0;
-//     document.getElementById('mediaFileName').textContent = name;
-//     document.getElementById('mediaTitle').value = name.replace(/\.[^/.]+$/, ''); // Remove extension
-//     updateMediaGroupSelect(); // Wypełnij select grup mediów
-//     openAssignMediaModal();
-// }
-
 function selectMediaFile(path, name, duration) {
     // Ustaw dane pliku
     document.getElementById('mediaFilePath').value = path;
@@ -1092,65 +1081,6 @@ function loadGroupsToSelect() {
     }
 }
 
-// async function openAssignMediaModal(filePath, duration, fileName) {
-//     document.getElementById('mediaFilePath').value = filePath;
-//     document.getElementById('mediaFileDuration').value = duration || 0;
-//     document.getElementById('mediaFileName').textContent = fileName || filePath;
-//     document.getElementById('mediaTitle').value = fileName ? fileName.replace(/\.[^/.]+$/, '') : '';
-//     document.getElementById('mediaDescription').value = '';
-    
-//     // Załaduj listę Staff (autorów)
-//     const staffSelect = document.getElementById('mediaStaff');
-//     staffSelect.innerHTML = '<option value="">Brak</option>';
-    
-//     if (assignedStaff && assignedStaff.length > 0) {
-//         assignedStaff.forEach(assignment => {
-//             if (assignment.staff) {
-//                 const option = document.createElement('option');
-//                 option.value = assignment.id;
-//                 option.textContent = `${assignment.staff.first_name} ${assignment.staff.last_name}`;
-//                 staffSelect.appendChild(option);
-//             }
-//         });
-//     }
-    
-//     // Załaduj grupy do select multiple
-//     const groupsSelect = document.getElementById('mediaGroupsSelect');
-//     groupsSelect.innerHTML = '';
-    
-//     if (mediaGroups && mediaGroups.length > 0) {
-//         // Najpierw grupy systemowe
-//         const systemGroups = mediaGroups.filter(g => g.is_system);
-//         const userGroups = mediaGroups.filter(g => !g.is_system);
-        
-//         if (systemGroups.length > 0) {
-//             const optgroup = document.createElement('optgroup');
-//             optgroup.label = 'Grupy systemowe';
-//             systemGroups.forEach(group => {
-//                 const option = document.createElement('option');
-//                 option.value = group.id;
-//                 option.textContent = group.name;
-//                 optgroup.appendChild(option);
-//             });
-//             groupsSelect.appendChild(optgroup);
-//         }
-        
-//         if (userGroups.length > 0) {
-//             const optgroup = document.createElement('optgroup');
-//             optgroup.label = 'Grupy użytkownika';
-//             userGroups.forEach(group => {
-//                 const option = document.createElement('option');
-//                 option.value = group.id;
-//                 option.textContent = group.name;
-//                 optgroup.appendChild(option);
-//             });
-//             groupsSelect.appendChild(optgroup);
-//         }
-//     }
-    
-//     document.getElementById('assignMediaModal').classList.add('active');
-// }
-
 function openAssignMediaModal(filePath, duration, fileName) {
     // Jeśli przekazano parametry, wypełnij formularz
     if (filePath) {
@@ -1185,33 +1115,14 @@ function openAssignMediaModal(filePath, duration, fileName) {
     // Załaduj grupy
     loadGroupsToSelect();
     
-    // Otwórz modal
-    // document.getElementById('assignMediaModal').style.display = 'flex';
-    // LUB jeśli używasz classList:
     document.getElementById('assignMediaModal').classList.add('active');
 }
 
-// function closeAssignMediaModal() {
-//     document.getElementById('assignMediaModal').classList.remove('active');
-//     document.getElementById('assignMediaForm').reset();
-// }
-
-// function closeAssignMediaModal() {
-//     const modal = document.getElementById('assignMediaModal');
-//     modal.classList.remove('active');
-    
-//     // Wyczyść tryb edycji
-//     delete modal.dataset.editMode;
-//     delete modal.dataset.editMediaId;
-    
-//     document.getElementById('assignMediaForm').reset();
-// }
-
 function closeAssignMediaModal() {
     const modal = document.getElementById('assignMediaModal');
-    modal.style.display = 'none';
+    // modal.style.display = 'none';
     // LUB jeśli używasz classList:
-    // modal.classList.remove('active');
+    modal.classList.remove('active');
     
     // Wyczyść tryb edycji
     delete modal.dataset.editMode;
@@ -1220,71 +1131,6 @@ function closeAssignMediaModal() {
     // Resetuj formularz
     document.getElementById('assignMediaForm').reset();
 }
-
-// async function assignMedia() {
-//     const filePath = document.getElementById('mediaFilePath').value;
-//     const duration = parseInt(document.getElementById('mediaFileDuration').value) || 0;
-//     const title = document.getElementById('mediaTitle').value;
-//     const description = document.getElementById('mediaDescription').value;
-//     const staffId = document.getElementById('mediaStaff').value;
-    
-//     // Pobierz wybrane grupy z select multiple
-//     const groupsSelect = document.getElementById('mediaGroupsSelect');
-//     const selectedGroupIds = Array.from(groupsSelect.selectedOptions).map(opt => parseInt(opt.value));
-    
-//     if (selectedGroupIds.length === 0) {
-//         alert('Wybierz przynajmniej jedną grupę!');
-//         return;
-//     }
-    
-//     try {
-//         // 1. Utwórz media (bez scene_id)
-//         const mediaData = {
-//             title: title,
-//             description: description,
-//             file_path: filePath,
-//             duration: duration,
-//             episode_staff_id: staffId ? parseInt(staffId) : null
-//         };
-        
-//         const mediaResponse = await fetch(`/api/episodes/${currentEpisodeId}/media`, {
-//             method: 'POST',
-//             headers: { 'Content-Type': 'application/json' },
-//             body: JSON.stringify(mediaData)
-//         });
-        
-//         if (!mediaResponse.ok) {
-//             const error = await mediaResponse.text();
-//             throw new Error(error);
-//         }
-        
-//         const createdMedia = await mediaResponse.json();
-        
-//         // 2. Przypisz media do wybranych grup
-//         for (const groupId of selectedGroupIds) {
-//             const assignmentResponse = await fetch(`/api/media-groups/${groupId}/items`, {
-//                 method: 'POST',
-//                 headers: { 'Content-Type': 'application/json' },
-//                 body: JSON.stringify({
-//                     episode_media_id: createdMedia.id
-//                 })
-//             });
-            
-//             if (!assignmentResponse.ok) {
-//                 console.error(`Nie udało się przypisać do grupy ${groupId}`);
-//             }
-//         }
-        
-//         closeAssignMediaModal();
-//         await loadEpisodeDetails(currentEpisodeId);
-//         switchMediaSubTab('assigned');
-//         alert('Media przypisane pomyślnie!');
-        
-//     } catch (error) {
-//         console.error('Błąd przypisywania media:', error);
-//         alert('Błąd: ' + error.message);
-//     }
-// }
 
 // Zaktualizowana funkcja assignMedia aby obsługiwała edycję
 async function assignMedia() {
@@ -1498,10 +1344,6 @@ function editMediaAssignment(mediaId) {
     document.getElementById('mediaDescription').value = media.description || '';
     document.getElementById('mediaStaff').value = media.episode_staff_id || '';
     
-    // Usuń stare pola scen - nie są już używane
-    // document.getElementById('sceneMedia').checked = ...
-    // document.getElementById('sceneReportaze').checked = ...
-    
     // Zapisz ID media jako tryb edycji
     document.getElementById('assignMediaModal').dataset.editMode = 'true';
     document.getElementById('assignMediaModal').dataset.editMediaId = mediaId;
@@ -1555,68 +1397,6 @@ function editMediaAssignment(mediaId) {
     document.getElementById('assignMediaModal').classList.add('active');
 }
 
-// function editMediaAssignment(filePath) {
-//     // Znajdź wszystkie media z tym plikiem
-//     const mediaItems = assignedMedia.filter(m => m.file_path === filePath);
-//     if (mediaItems.length === 0) return;
-
-//     const first = mediaItems[0];
-    
-//     // Wypełnij formularz
-//     document.getElementById('mediaFilePath').value = filePath;
-//     document.getElementById('mediaFileDuration').value = first.duration || 0;
-//     document.getElementById('mediaFileName').textContent = filePath.split('/').pop();
-//     document.getElementById('mediaTitle').value = first.title;
-//     document.getElementById('mediaDescription').value = first.description || '';
-//     document.getElementById('mediaStaff').value = first.episode_staff_id || '';
-    
-//     // Zaznacz sceny
-//     document.getElementById('sceneMedia').checked = mediaItems.some(m => m.scene?.name === 'MEDIA');
-//     document.getElementById('sceneReportaze').checked = mediaItems.some(m => m.scene?.name === 'REPORTAZE');
-//     document.getElementById('sceneError').style.display = 'none';
-    
-//     // Zapisz oryginalne file_path jako identyfikator edycji
-//     document.getElementById('assignMediaModal').dataset.editMode = 'true';
-//     document.getElementById('assignMediaModal').dataset.originalFilePath = filePath;
-    
-//     // Najpierw wygeneruj checkboxy grup
-//     updateMediaGroupSelect();
-    
-//     // Następnie zaznacz grupy, do których należą te media
-//     // Pobierz ID wszystkich media dla tego pliku
-//     const mediaIds = mediaItems.map(m => m.id);
-    
-//     // Przeszukaj wszystkie grupy i zaznacz te, które zawierają którekolwiek z tych media
-//     setTimeout(() => {
-//         mediaGroups.forEach(group => {
-//             // Sprawdź czy grupa zawiera którekolwiek z tych media
-//             // (To jest uproszczenie - w pełnej implementacji trzeba by sprawdzić media_group_items)
-//             // Na razie zostawiamy niezaznaczone, bo przy edycji nie zachowujemy grup
-//         });
-//     }, 100);
-    
-//     document.getElementById('assignMediaModal').classList.add('active');
-// }
-
-// async function removeMediaFile(filePath) {
-//     if (!confirm('Czy na pewno usunąć to media ze wszystkich scen?')) return;
-
-//     try {
-//         const mediaItems = assignedMedia.filter(m => m.file_path === filePath);
-        
-//         for (const item of mediaItems) {
-//             await fetch(`/api/episodes/${currentEpisodeId}/media/${item.id}`, {
-//                 method: 'DELETE'
-//             });
-//         }
-        
-//         await loadAssignedMedia();
-//     } catch (error) {
-//         console.error('Błąd:', error);
-//         alert('Błąd usuwania');
-//     }
-// }
-
 async function removeMedia(mediaId) {
     if (!confirm('Czy na pewno chcesz usunąć to media? Zostanie usunięte ze wszystkich grup.')) {
         return;
@@ -1631,8 +1411,6 @@ async function removeMedia(mediaId) {
             throw new Error('Nie udało się usunąć media');
         }
         
-        // await loadEpisodeDetails(currentEpisodeId);
-        // ----->
         await Promise.all([
             loadAssignedMedia(),
             loadMediaGroups()
@@ -1640,7 +1418,6 @@ async function removeMedia(mediaId) {
         renderAssignedMedia();
         renderMediaGroups();
         await loadMediaFiles();
-        // <-----
         alert('Media usunięte pomyślnie!');
         
     } catch (error) {
@@ -1813,8 +1590,6 @@ async function createMediaGroup() {
         }
         
         closeAddMediaGroupModal();
-        // await loadEpisodeDetails(currentEpisodeId);
-        // ----->
         await Promise.all([
             loadAssignedMedia(),
             loadMediaGroups()
@@ -1822,7 +1597,6 @@ async function createMediaGroup() {
         renderAssignedMedia();
         renderMediaGroups();
         await loadMediaFiles();
-        // <-----
         switchMediaSubTab('groups');
         alert('Grupa utworzona pomyślnie!');
         
@@ -1883,8 +1657,6 @@ async function updateMediaGroup() {
         }
         
         closeManageMediaGroupModal();
-        // await loadEpisodeDetails(currentEpisodeId);
-        // ----->
         await Promise.all([
             loadAssignedMedia(),
             loadMediaGroups()
@@ -1892,7 +1664,6 @@ async function updateMediaGroup() {
         renderAssignedMedia();
         renderMediaGroups();
         await loadMediaFiles();
-        // <-----
         alert('Grupa zaktualizowana pomyślnie!');
         
     } catch (error) {
@@ -2076,7 +1847,7 @@ async function loadGroupMediaItems(groupId) {
                     </div>
                     <div class="group-media-order">
                         <button class="btn btn-danger btn-icon" 
-                                onclick="removeMediaFromCurrentGroup(${groupId}, ${media.id})"
+                                onclick="removeMediaFromGroup(${groupId}, ${media.id})"
                                 title="Usuń z grupy">×</button>
                     </div>
                 </div>
@@ -2125,7 +1896,7 @@ async function addMediaToCurrentGroup(mediaId) {
     }
 }
 
-async function removeMediaFromCurrentGroup(groupId, mediaId) {
+async function removeMediaFromGroup(groupId, mediaId) {
     if (!confirm('Czy na pewno chcesz usunąć to media z grupy?')) return;
 
     try {

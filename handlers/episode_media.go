@@ -337,7 +337,8 @@ func (h *EpisodeMediaHandler) ListMediaFiles(w http.ResponseWriter, r *http.Requ
 
 // GetCurrentMediaForScene - GET /api/episodes/current/media/scene/{scene_name}
 // Pobiera aktywny plik media dla danej sceny z aktualnego odcinka
-// Zwraca pierwszy plik który ma current_in_scene ustawione na tę scenę
+// Zwraca plik z current_in_scene dla grupy MEDIA/REPORTAZE
+// Jeśli nie ma aktywnego, zwraca plik z najniższym order w tej grupie
 func (h *EpisodeMediaHandler) GetCurrentMediaForScene(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	sceneName := vars["scene_name"]
@@ -364,21 +365,57 @@ func (h *EpisodeMediaHandler) GetCurrentMediaForScene(w http.ResponseWriter, r *
 		return
 	}
 
-	// Szukaj przypisania media do grupy, które ma current_in_scene ustawione na tę scenę
-	var assignment models.EpisodeMediaGroup
-	result := h.DB.Preload("EpisodeMedia").
-		Preload("MediaGroup").
-		Joins("INNER JOIN episode_media ON episode_media.id = episode_media_groups.episode_media_id").
-		Where("episode_media.episode_id = ? AND episode_media_groups.current_in_scene = ?",
-			currentEpisode.ID, scene.ID).
-		First(&assignment)
-
-	if result.Error == gorm.ErrRecordNotFound {
-		// Brak aktywnego media dla tej sceny
+	// Określ nazwę grupy na podstawie nazwy sceny
+	var groupName string
+	if sceneName == "MEDIA" {
+		groupName = "MEDIA"
+	} else if sceneName == "REPORTAZE" {
+		groupName = "REPORTAZE"
+	} else {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
-			"error":   "No active media found for this scene",
+			"error":   "Invalid scene name",
+		})
+		return
+	}
+
+	// Znajdź grupę o tej nazwie dla tego odcinka
+	var mediaGroup models.MediaGroup
+	result := h.DB.Where("episode_id = ? AND name = ?", currentEpisode.ID, groupName).First(&mediaGroup)
+	if result.Error != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Group not found",
+		})
+		return
+	}
+
+	// 1. Najpierw szukaj przypisania które jest aktywne (current_in_scene = scene.ID lub 0)
+	var assignment models.EpisodeMediaGroup
+	result = h.DB.Preload("EpisodeMedia").
+		Preload("MediaGroup").
+		Where("media_group_id = ? AND (current_in_scene = ? OR current_in_scene = 0)",
+			mediaGroup.ID, scene.ID).
+		Order("\"order\" ASC").
+		First(&assignment)
+
+	// 2. Jeśli nie znaleziono aktywnego, weź plik z najniższym order
+	if result.Error == gorm.ErrRecordNotFound {
+		result = h.DB.Preload("EpisodeMedia").
+			Preload("MediaGroup").
+			Where("media_group_id = ?", mediaGroup.ID).
+			Order("\"order\" ASC").
+			First(&assignment)
+	}
+
+	if result.Error == gorm.ErrRecordNotFound {
+		// Brak mediów w tej grupie
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "No media in this group",
 		})
 		return
 	}
@@ -401,16 +438,17 @@ func (h *EpisodeMediaHandler) GetCurrentMediaForScene(w http.ResponseWriter, r *
 		// Zbuduj pełną ścieżkę: C:/Users/.../media/season_1/file.mp4
 		fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*currentMedia.FilePath))
 
-		// Pobierz źródło z bazy dla tej sceny
-		// Szukamy pierwszego źródła typu "Media Source" w tej scenie
-		var source models.Source
-		result := h.DB.Where("scene_id = ?", scene.ID).
-			Order("source_order ASC").
-			First(&source)
+		// Określ nazwę źródła w OBS na podstawie nazwy sceny
+		var inputName string
+		if sceneName == "MEDIA" {
+			inputName = "Media1"
+		} else if sceneName == "REPORTAZE" {
+			inputName = "Reportaze1"
+		}
 
-		if result.Error == nil && source.Name != "" {
+		if inputName != "" {
 			// Ustaw ustawienia źródła w OBS
-			err = h.OBSClient.SetInputSettings(source.Name, map[string]interface{}{
+			err = h.OBSClient.SetInputSettings(inputName, map[string]interface{}{
 				"local_file":          fullPath,
 				"clear_on_media_end":  false,
 				"close_when_inactive": true,
@@ -418,7 +456,7 @@ func (h *EpisodeMediaHandler) GetCurrentMediaForScene(w http.ResponseWriter, r *
 
 			if err != nil {
 				// Loguj błąd, ale nie przerywaj - zwróć dane mimo błędu OBS
-				fmt.Printf("Błąd ustawiania pliku w OBS: %v\n", err)
+				fmt.Printf("Błąd ustawiania pliku w OBS dla źródła %s: %v\n", inputName, err)
 			}
 		}
 	}
