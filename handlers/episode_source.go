@@ -328,3 +328,162 @@ func (h *EpisodeSourceHandler) autoAssignForSource(episodeID uint, sourceName st
 
 	return true, media.ID, media.Title
 }
+
+// AutoAssignVLCSources - POST /api/episodes/{episode_id}/auto-assign-vlc-sources
+// Automatycznie przypisuje grupy do Media2 i Reportaze2
+func (h *EpisodeSourceHandler) AutoAssignVLCSources(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	results := make(map[string]interface{})
+
+	// Przypisz dla Media2
+	if assigned, groupID, groupName := h.autoAssignVLCForSource(uint(episodeID), "Media2", "MEDIA"); assigned {
+		results["Media2"] = map[string]interface{}{
+			"assigned":  true,
+			"group_id":  groupID,
+			"name":      groupName,
+			"source":    "auto",
+		}
+	} else {
+		results["Media2"] = map[string]interface{}{
+			"assigned": false,
+			"reason":   "no group with ≥2 files or already assigned",
+		}
+	}
+
+	// Przypisz dla Reportaze2
+	if assigned, groupID, groupName := h.autoAssignVLCForSource(uint(episodeID), "Reportaze2", "REPORTAZE"); assigned {
+		results["Reportaze2"] = map[string]interface{}{
+			"assigned":  true,
+			"group_id":  groupID,
+			"name":      groupName,
+			"source":    "auto",
+		}
+	} else {
+		results["Reportaze2"] = map[string]interface{}{
+			"assigned": false,
+			"reason":   "no group with ≥2 files or already assigned",
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
+}
+
+// autoAssignVLCForSource - funkcja pomocnicza do automatycznego przypisania grupy
+// Priorytet: 1) grupa systemowa z ≥2 plikami, 2) pierwsza grupa użytkownika z ≥2 plikami
+func (h *EpisodeSourceHandler) autoAssignVLCForSource(episodeID uint, sourceName string, systemGroupName string) (bool, uint, string) {
+	// Sprawdź czy już jest przypisanie
+	existing, err := models.GetEpisodeSourceAssignment(h.DB, episodeID, sourceName)
+	if err == nil && existing != nil {
+		// Jest przypisanie - nie nadpisuj
+		return false, 0, ""
+	}
+
+	var selectedGroup *models.MediaGroup
+
+	// PRIORYTET 1: Grupa systemowa (MEDIA/REPORTAZE) z ≥2 plikami
+	var systemGroup models.MediaGroup
+	err = h.DB.Preload("MediaItems").
+		Where("episode_id = ? AND name = ? AND is_system = ?", episodeID, systemGroupName, true).
+		First(&systemGroup).Error
+
+	if err == nil && len(systemGroup.MediaItems) >= 2 {
+		selectedGroup = &systemGroup
+		fmt.Printf("Auto-assign VLC: znaleziono grupę systemową %s z %d plikami\n", systemGroup.Name, len(systemGroup.MediaItems))
+	}
+
+	// PRIORYTET 2: Pierwsza grupa użytkownika z ≥2 plikami
+	if selectedGroup == nil {
+		var userGroups []models.MediaGroup
+		err = h.DB.Preload("MediaItems").
+			Where("episode_id = ? AND is_system = ?", episodeID, false).
+			Order("\"order\" ASC").
+			Find(&userGroups).Error
+
+		if err == nil {
+			for _, group := range userGroups {
+				if len(group.MediaItems) >= 2 {
+					selectedGroup = &group
+					fmt.Printf("Auto-assign VLC: znaleziono grupę użytkownika %s z %d plikami\n", group.Name, len(group.MediaItems))
+					break
+				}
+			}
+		}
+	}
+
+	// Brak odpowiedniej grupy
+	if selectedGroup == nil {
+		fmt.Printf("Auto-assign VLC: brak grupy z ≥2 plikami dla %s\n", sourceName)
+		return false, 0, ""
+	}
+
+	// Przygotuj playlistę dla VLC Video Source
+	playlist := make([]map[string]interface{}, 0)
+	
+	absMediaPath, err := filepath.Abs(h.MediaPath)
+	if err != nil {
+		absMediaPath = h.MediaPath
+	}
+
+	for _, item := range selectedGroup.MediaItems {
+		// Pobierz pełne dane pliku
+		var media models.EpisodeMedia
+		if err := h.DB.First(&media, item.EpisodeMediaID).Error; err != nil {
+			continue
+		}
+
+		if media.FilePath != nil && *media.FilePath != "" {
+			fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*media.FilePath))
+			playlist = append(playlist, map[string]interface{}{
+				"value": fullPath,
+			})
+		}
+	}
+
+	if len(playlist) == 0 {
+		fmt.Printf("Auto-assign VLC: brak prawidłowych plików w grupie %s\n", selectedGroup.Name)
+		return false, 0, ""
+	}
+
+	// Wczytaj playlistę do OBS (jeśli połączony)
+	if h.OBSClient != nil && h.OBSClient.IsConnected() {
+		err = h.OBSClient.SetInputSettings(sourceName, map[string]interface{}{
+			"playlist": playlist,
+			"loop":     false,
+			"shuffle":  false,
+		})
+
+		if err != nil {
+			fmt.Printf("Błąd ustawiania automatycznej playlisty w OBS dla %s: %v\n", sourceName, err)
+			return false, 0, ""
+		}
+
+		fmt.Printf("Auto-assign VLC: wczytano %d plików do źródła %s\n", len(playlist), sourceName)
+	}
+
+	// Zapisz przypisanie
+	err = models.SetEpisodeSourceGroup(h.DB, episodeID, sourceName, selectedGroup.ID, "auto")
+	if err != nil {
+		fmt.Printf("Błąd zapisywania automatycznego przypisania grupy dla %s: %v\n", sourceName, err)
+		return false, 0, ""
+	}
+
+	// Wyślij broadcast
+	if h.SocketHandler != nil && h.SocketHandler.Server != nil {
+		h.SocketHandler.Server.BroadcastToNamespace("/", "source_group_assigned", map[string]interface{}{
+			"episode_id":  episodeID,
+			"source_name": sourceName,
+			"group_id":    selectedGroup.ID,
+			"name":        selectedGroup.Name,
+		})
+	}
+
+	return true, selectedGroup.ID, selectedGroup.Name
+}
+

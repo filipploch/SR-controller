@@ -224,6 +224,20 @@ socket.on('source_media_assigned', (data) => {
     updateSourceButtonText(data.source_name, data.title);
 });
 
+// Nasłuchuj na broadcast przypisania grupy (VLC Video Source)
+socket.on('source_group_assigned', (data) => {
+    console.log('Otrzymano broadcast przypisania grupy:', data);
+
+    // Sprawdź czy dotyczy aktualnego odcinka
+    if (currentEpisodeId && data.episode_id !== currentEpisodeId) {
+        console.log('Ignoruję - inny odcinek');
+        return;
+    }
+
+    // Zaktualizuj przycisk
+    updateSourceButtonText(data.source_name, data.name);
+});
+
 // Załaduj wszystkie przypisania przy starcie
 async function loadAllSourceAssignments() {
     if (!currentEpisodeId) {
@@ -259,7 +273,7 @@ async function autoAssignMediaSources() {
         });
         const result = await response.json();
 
-        console.log('Wynik automatycznego przypisania:', result);
+        console.log('Wynik automatycznego przypisania Media1/Reportaze1:', result);
 
         // Zaktualizuj przyciski dla przypisanych źródeł
         if (result.Media1 && result.Media1.assigned) {
@@ -267,6 +281,33 @@ async function autoAssignMediaSources() {
         }
         if (result.Reportaze1 && result.Reportaze1.assigned) {
             updateSourceButtonText('Reportaze1', result.Reportaze1.title);
+        }
+    } catch (error) {
+        console.error('Błąd automatycznego przypisania Media1/Reportaze1:', error);
+    }
+}
+
+// Automatyczne przypisanie Media2 i Reportaze2 jeśli nie mają przypisań
+async function autoAssignVLCSources() {
+    if (!currentEpisodeId) {
+        console.log('Brak aktualnego odcinka - pomijam automatyczne przypisanie VLC');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/episodes/${currentEpisodeId}/auto-assign-vlc-sources`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+
+        console.log('Wynik automatycznego przypisania Media2/Reportaze2:', result);
+
+        // Zaktualizuj przyciski dla przypisanych źródeł
+        if (result.Media2 && result.Media2.assigned) {
+            updateSourceButtonText('Media2', result.Media2.name);
+        }
+        if (result.Reportaze2 && result.Reportaze2.assigned) {
+            updateSourceButtonText('Reportaze2', result.Reportaze2.name);
         }
     } catch (error) {
         console.error('Błąd automatycznego przypisania:', error);
@@ -289,8 +330,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // Załaduj aktualny odcinek przy połączeniu
 socket.on('connect', () => {
     loadCurrentEpisode().then(() => {
-        // Automatycznie przypisz jeśli brak
+        // Automatycznie przypisz Media1/Reportaze1 i Media2/Reportaze2
         // (renderSources wywoła loadAllSourceAssignments() po wyrenderowaniu przycisków)
-        autoAssignMediaSources();
+        autoAssignMediaSources().then(() => {
+            autoAssignVLCSources();
+        });
     });
 });

@@ -1557,9 +1557,16 @@ function renderMediaGroups() {
 
 function openAddMediaGroupModal() {
     document.getElementById('addMediaGroupForm').reset();
-    document.getElementById('groupSceneMedia').checked = false;
-    document.getElementById('groupSceneReportaze').checked = false;
-    document.getElementById('groupSceneError').style.display = 'none';
+    
+    // Sprawdź czy checkboxy istnieją (stary kod)
+    const sceneMediaCheckbox = document.getElementById('groupSceneMedia');
+    const sceneReportazeCheckbox = document.getElementById('groupSceneReportaze');
+    const sceneError = document.getElementById('groupSceneError');
+    
+    if (sceneMediaCheckbox) sceneMediaCheckbox.checked = false;
+    if (sceneReportazeCheckbox) sceneReportazeCheckbox.checked = false;
+    if (sceneError) sceneError.style.display = 'none';
+    
     document.getElementById('addMediaGroupModal').classList.add('active');
 }
 
