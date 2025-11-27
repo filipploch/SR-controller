@@ -72,6 +72,7 @@ func main() {
 	mediaPath := "./media"
 	os.MkdirAll(mediaPath, 0755)
 	episodeMediaHandler := handlers.NewEpisodeMediaHandler(db, mediaPath, obsClient)
+	episodeSourceHandler := handlers.NewEpisodeSourceHandler(db, obsClient, mediaPath, socketHandler)
 
 	// Routing
 	router := mux.NewRouter()
@@ -217,6 +218,12 @@ func main() {
 	api.HandleFunc("/episodes/{episode_id}/media-groups/{group_id}/set-current", mediaGroupHandler.SetCurrentMediaGroup).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/media-groups/clear-current", mediaGroupHandler.ClearCurrentMediaGroupHandler).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/media-groups/current", mediaGroupHandler.GetCurrentMediaGroupHandler).Methods("GET")
+
+	// Endpointy dla przypisań źródeł (episode_sources)
+	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/assign-media", episodeSourceHandler.AssignMediaToSource).Methods("POST")
+	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/media-list", episodeSourceHandler.GetMediaForSourceModal).Methods("GET")
+	api.HandleFunc("/episodes/{episode_id}/source-assignments", episodeSourceHandler.GetSourceAssignments).Methods("GET")
+	api.HandleFunc("/episodes/{episode_id}/auto-assign-media-sources", episodeSourceHandler.AutoAssignMediaSources).Methods("POST")
 
 	log.Println("========================================")
 	log.Println("Serwer działa: http://localhost:8080")

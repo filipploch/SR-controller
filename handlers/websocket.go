@@ -5,15 +5,23 @@ import (
 	"log"
 	"obs-controller/models"
 	"obs-controller/obsws"
+	"sync"
 
 	socketio "github.com/googollee/go-socket.io"
 	"gorm.io/gorm"
 )
 
 type SocketHandler struct {
-	Server    *socketio.Server
-	DB        *gorm.DB
-	OBSClient *obsws.Client
+	Server         *socketio.Server
+	DB             *gorm.DB
+	OBSClient      *obsws.Client
+	vlcAssignments map[uint]map[string]VLCAssignment // episode_id -> (source_name -> assignment)
+	mu             sync.RWMutex
+}
+
+type VLCAssignment struct {
+	GroupName string `json:"group_name"`
+	GroupID   uint   `json:"group_id"`
 }
 
 type ActionRequest struct {
@@ -27,9 +35,10 @@ func NewSocketHandler(db *gorm.DB, obsClient *obsws.Client) (*SocketHandler, err
 	server := socketio.NewServer(nil)
 
 	handler := &SocketHandler{
-		Server:    server,
-		DB:        db,
-		OBSClient: obsClient,
+		Server:         server,
+		DB:             db,
+		OBSClient:      obsClient,
+		vlcAssignments: make(map[uint]map[string]VLCAssignment),
 	}
 
 	server.OnConnect("/", func(s socketio.Conn) error {
@@ -91,17 +100,32 @@ func (h *SocketHandler) handleGetSources(s socketio.Conn, sceneName string) stri
 	for _, item := range items {
 		sourceName, _ := item["sourceName"].(string)
 		sceneItemIndex, _ := item["sceneItemIndex"].(float64)
+		sourceType, _ := item["sourceType"].(string)
+
+		// Pomiń źródła typu SCENE i FILTER
+		if sourceType == "OBS_SOURCE_TYPE_SCENE" || sourceType == "OBS_SOURCE_TYPE_FILTER" {
+			log.Printf("Pomijam źródło typu %s: %s", sourceType, sourceName)
+			continue
+		}
+
+		// Jeśli brak sourceType, ustaw domyślny
+		if sourceType == "" {
+			sourceType = "UNKNOWN"
+		}
 
 		if _, exists := dbSourceMap[sourceName]; !exists {
 			// Nowe źródło - dodaj z kolejnością z OBS
 			source := models.Source{
 				SceneID:     scene.ID,
 				Name:        sourceName,
+				SourceType:  sourceType,
 				SourceOrder: int(sceneItemIndex),
 				IsVisible:   false,
 			}
 			h.DB.Create(&source)
 			hasChanges = true
+
+			log.Printf("Utworzono nowe źródło: %s (typ: %s)", sourceName, sourceType)
 		}
 	}
 
@@ -414,4 +438,40 @@ func (h *SocketHandler) errorResponse(message string) string {
 	}
 	jsonData, _ := json.Marshal(response)
 	return string(jsonData)
+}
+
+// SaveVLCAssignment zapisuje przypisanie grupy do źródła VLC dla danego odcinka
+func (h *SocketHandler) SaveVLCAssignment(episodeID uint, sourceName string, groupName string, groupID uint) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.vlcAssignments[episodeID] == nil {
+		h.vlcAssignments[episodeID] = make(map[string]VLCAssignment)
+	}
+
+	h.vlcAssignments[episodeID][sourceName] = VLCAssignment{
+		GroupName: groupName,
+		GroupID:   groupID,
+	}
+
+	log.Printf("Zapisano przypisanie VLC: Episode %d, Source %s -> Group %s (ID: %d)", episodeID, sourceName, groupName, groupID)
+}
+
+// GetVLCAssignments pobiera przypisania VLC dla danego odcinka
+func (h *SocketHandler) GetVLCAssignments(episodeID uint) map[string]interface{} {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	result := make(map[string]interface{})
+
+	if assignments, exists := h.vlcAssignments[episodeID]; exists {
+		for sourceName, assignment := range assignments {
+			result[sourceName] = map[string]interface{}{
+				"group_name": assignment.GroupName,
+				"group_id":   assignment.GroupID,
+			}
+		}
+	}
+
+	return result
 }

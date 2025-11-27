@@ -1,0 +1,183 @@
+/* ===== MODAL WYBORU MEDIÓW ===== */
+
+.source-button-wrapper {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.open-modal-btn {
+    background: #555;
+    color: white;
+    border: 1px solid #777;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 14px;
+    min-width: 40px;
+    transition: background 0.2s;
+}
+
+.open-modal-btn:hover {
+    background: #666;
+}
+
+.media-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.media-modal-overlay.active {
+    display: flex;
+}
+
+.media-modal {
+    background: #2a2a2a;
+    border: 2px solid #555;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.media-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #444;
+    background: #333;
+    border-radius: 6px 6px 0 0;
+}
+
+.media-modal-header h3 {
+    margin: 0;
+    color: #fff;
+    font-size: 16px;
+}
+
+.media-modal-close {
+    background: transparent;
+    border: none;
+    color: #aaa;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.media-modal-close:hover {
+    color: #fff;
+}
+
+.media-modal-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.media-group {
+    margin-bottom: 12px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #333;
+}
+
+.media-group.expanded {
+    background: #3a3a3a;
+}
+
+.media-group-header {
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+}
+
+.media-group-header:hover {
+    background: #404040;
+}
+
+.media-group-name {
+    font-weight: 600;
+    color: #fff;
+    font-size: 14px;
+}
+
+.media-group.system .media-group-name {
+    color: #4CAF50;
+}
+
+.media-group-toggle {
+    color: #888;
+    font-size: 12px;
+}
+
+.media-items-list {
+    display: none;
+    padding: 8px 12px 12px 12px;
+    border-top: 1px solid #444;
+}
+
+.media-group.expanded .media-items-list {
+    display: block;
+}
+
+.media-item {
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #ccc;
+}
+
+.media-item:hover {
+    background: #404040;
+    border-color: #777;
+}
+
+.media-item.active {
+    font-weight: bold;
+    color: #fff;
+    background: #1976D2;
+    border-color: #1976D2;
+}
+
+.media-item.active:hover {
+    background: #1565C0;
+}
+
+.no-media {
+    padding: 8px 12px;
+    color: #888;
+    font-style: italic;
+    font-size: 13px;
+}
+
+/* ===== DODATKOWY CSS DLA ISTNIEJĄCYCH PRZYCISKÓW ===== */
+
+.source-button-wrapper .source-btn {
+    flex: 1;
+    margin-bottom: 0;
+}

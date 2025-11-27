@@ -154,14 +154,40 @@ type Source struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	SceneID     uint      `gorm:"index;not null" json:"scene_id"`
 	Scene       Scene     `gorm:"foreignKey:SceneID" json:"scene"`
-	Name        string    `gorm:"size:200;not null" json:"name"`   // Nazwa źródła w OBS
-	DisplayName *string   `gorm:"size:200" json:"display_name"`    // Tekst na przycisku kontrolera (nullable)
-	SourceOrder int       `gorm:"default:0" json:"source_order"`   // Domyślna kolejność
-	IsVisible   bool      `gorm:"default:false" json:"is_visible"` // Stan użytkownika (dla mikrofonów)
-	IconURL     *string   `gorm:"size:500" json:"icon_url"`        // Ikona dla przycisku (nullable)
-	Color       string    `gorm:"size:20" json:"color"`            // Kolor przycisku (hex)
+	Name        string    `gorm:"size:200;not null" json:"name"`        // Nazwa źródła w OBS
+	SourceType  string    `gorm:"size:100;not null;default:'UNKNOWN'" json:"source_type"` // Typ źródła z OBS
+	SourceOrder int       `gorm:"default:0" json:"source_order"`        // Domyślna kolejność
+	IsVisible   bool      `gorm:"default:false" json:"is_visible"`      // Stan użytkownika (dla mikrofonów)
+	IconURL     *string   `gorm:"size:500" json:"icon_url"`             // Ikona dla przycisku (nullable)
+	Color       string    `gorm:"size:20" json:"color"`                 // Kolor przycisku (hex)
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// EpisodeSource reprezentuje przypisanie źródła do odcinka
+// Uniwersalny model obsługujący różne typy źródeł:
+// - Media1/Reportaze1: MediaID (konkretny plik)
+// - Media2/Reportaze2: GroupID (grupa plików)
+// - Mikrofony: StaffID lub GuestID (osoba)
+// - Kamery: PresetID (preset kamery) - przyszłość
+type EpisodeSource struct {
+	ID         uint      `gorm:"primaryKey" json:"id"`
+	EpisodeID  uint      `gorm:"index;not null" json:"episode_id"`
+	Episode    Episode   `gorm:"foreignKey:EpisodeID" json:"episode"`
+	SourceName string    `gorm:"size:200;not null" json:"source_name"` // "Media1", "Media2", "Kamera1", "Mikrofon1"
+	
+	// Przypisania (tylko jedno wypełnione w zależności od typu źródła)
+	MediaID    *uint     `gorm:"index" json:"media_id"`   // Dla Media1/Reportaze1 → ID pliku
+	GroupID    *uint     `gorm:"index" json:"group_id"`   // Dla Media2/Reportaze2 → ID grupy
+	StaffID    *uint     `gorm:"index" json:"staff_id"`   // Dla mikrofonów → ID prowadzącego
+	GuestID    *uint     `gorm:"index" json:"guest_id"`   // Dla mikrofonów → ID gościa
+	PresetID   *uint     `gorm:"index" json:"preset_id"`  // Dla kamer → ID presetu (przyszłość)
+	
+	// Metadane
+	AssignedBy string    `gorm:"size:50;default:'manual'" json:"assigned_by"` // "auto" lub "manual"
+	
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // EpisodeMedia reprezentuje media (reportaże, filmy) przypisane do odcinka
@@ -183,7 +209,7 @@ type EpisodeMedia struct {
 
 // InitDB inicjalizuje bazę danych
 func InitDB(db *gorm.DB) error {
-	return db.AutoMigrate(
+	err := db.AutoMigrate(
 		&Season{},
 		&Episode{},
 		&StaffType{},
@@ -196,9 +222,22 @@ func InitDB(db *gorm.DB) error {
 		&MediaGroup{},
 		&Scene{},
 		&Source{},
+		&EpisodeSource{}, // NOWE: tabela pomostowa episode-source
 		&EpisodeMedia{},
 		&EpisodeMediaGroup{},
 	)
+
+	if err != nil {
+		return err
+	}
+
+	// Ustaw domyślny typ dla istniejących źródeł (migracja)
+	db.Exec("UPDATE sources SET source_type = 'UNKNOWN' WHERE source_type = '' OR source_type IS NULL")
+
+	// Dodaj unikalny indeks na parę (episode_id, source_name) dla episode_sources
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_episode_source ON episode_sources(episode_id, source_name)")
+
+	return nil
 }
 
 // GetCurrentSeason pobiera aktualny sezon
@@ -646,4 +685,122 @@ func GetCurrentMediaGroup(db *gorm.DB, episodeID uint, sceneID uint) (*MediaGrou
 	}
 
 	return &group, nil
+}
+
+// ===== FUNKCJE DLA EPISODE_SOURCE =====
+
+// SetEpisodeSourceMedia ustawia przypisanie pliku media do źródła
+func SetEpisodeSourceMedia(db *gorm.DB, episodeID uint, sourceName string, mediaID uint, assignedBy string) error {
+	var episodeSource EpisodeSource
+
+	// Sprawdź czy wpis już istnieje
+	result := db.Where("episode_id = ? AND source_name = ?", episodeID, sourceName).First(&episodeSource)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		// Utwórz nowy wpis
+		episodeSource = EpisodeSource{
+			EpisodeID:  episodeID,
+			SourceName: sourceName,
+			MediaID:    &mediaID,
+			AssignedBy: assignedBy,
+		}
+		return db.Create(&episodeSource).Error
+	}
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	// Zaktualizuj istniejący wpis
+	episodeSource.MediaID = &mediaID
+	episodeSource.GroupID = nil // Wyczyść poprzednie przypisanie grupy (jeśli było)
+	episodeSource.AssignedBy = assignedBy
+	return db.Save(&episodeSource).Error
+}
+
+// SetEpisodeSourceGroup ustawia przypisanie grupy do źródła VLC
+func SetEpisodeSourceGroup(db *gorm.DB, episodeID uint, sourceName string, groupID uint, assignedBy string) error {
+	var episodeSource EpisodeSource
+
+	// Sprawdź czy wpis już istnieje
+	result := db.Where("episode_id = ? AND source_name = ?", episodeID, sourceName).First(&episodeSource)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		// Utwórz nowy wpis
+		episodeSource = EpisodeSource{
+			EpisodeID:  episodeID,
+			SourceName: sourceName,
+			GroupID:    &groupID,
+			AssignedBy: assignedBy,
+		}
+		return db.Create(&episodeSource).Error
+	}
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	// Zaktualizuj istniejący wpis
+	episodeSource.GroupID = &groupID
+	episodeSource.MediaID = nil // Wyczyść poprzednie przypisanie media (jeśli było)
+	episodeSource.AssignedBy = assignedBy
+	return db.Save(&episodeSource).Error
+}
+
+// GetEpisodeSourceAssignment pobiera przypisanie dla źródła
+func GetEpisodeSourceAssignment(db *gorm.DB, episodeID uint, sourceName string) (*EpisodeSource, error) {
+	var episodeSource EpisodeSource
+
+	result := db.Where("episode_id = ? AND source_name = ?", episodeID, sourceName).First(&episodeSource)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return &episodeSource, nil
+}
+
+// GetAllEpisodeSourceAssignments pobiera wszystkie przypisania dla odcinka
+func GetAllEpisodeSourceAssignments(db *gorm.DB, episodeID uint) (map[string]interface{}, error) {
+	var episodeSources []EpisodeSource
+
+	result := db.Where("episode_id = ?", episodeID).Find(&episodeSources)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	assignments := make(map[string]interface{})
+
+	for _, es := range episodeSources {
+		if es.MediaID != nil {
+			// Pobierz tytuł media
+			var media EpisodeMedia
+			if err := db.First(&media, *es.MediaID).Error; err == nil {
+				assignments[es.SourceName] = map[string]interface{}{
+					"type":        "media",
+					"media_id":    *es.MediaID,
+					"button_text": media.Title,
+					"assigned_by": es.AssignedBy,
+				}
+			}
+		} else if es.GroupID != nil {
+			// Pobierz nazwę grupy
+			var group MediaGroup
+			if err := db.First(&group, *es.GroupID).Error; err == nil {
+				assignments[es.SourceName] = map[string]interface{}{
+					"type":        "group",
+					"group_id":    *es.GroupID,
+					"button_text": group.Name,
+					"assigned_by": es.AssignedBy,
+				}
+			}
+		}
+	}
+
+	return assignments, nil
 }

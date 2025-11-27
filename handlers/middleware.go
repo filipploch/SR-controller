@@ -68,6 +68,18 @@ func (m *InitMiddleware) InitializeOBSData() error {
 			}
 
 			sceneItemIndex, _ := item["sceneItemIndex"].(float64)
+			sourceType, _ := item["sourceType"].(string)
+
+			// Pomiń źródła typu SCENE i FILTER
+			if sourceType == "OBS_SOURCE_TYPE_SCENE" || sourceType == "OBS_SOURCE_TYPE_FILTER" {
+				log.Printf("Pomijam źródło typu %s: %s (scena: %s)", sourceType, sourceName, sceneName)
+				continue
+			}
+
+			// Jeśli brak sourceType, ustaw domyślny
+			if sourceType == "" {
+				sourceType = "UNKNOWN"
+			}
 
 			var source models.Source
 			result := m.DB.Where("scene_id = ? AND name = ?", scene.ID, sourceName).First(&source)
@@ -75,11 +87,14 @@ func (m *InitMiddleware) InitializeOBSData() error {
 				source = models.Source{
 					SceneID:     scene.ID,
 					Name:        sourceName,
+					SourceType:  sourceType,
 					SourceOrder: int(sceneItemIndex),
 					IsVisible:   false,
 				}
 				if err := m.DB.Create(&source).Error; err != nil {
 					log.Printf("Błąd tworzenia źródła %s w scenie %s: %v", sourceName, sceneName, err)
+				} else {
+					log.Printf("Utworzono źródło: %s (typ: %s) w scenie %s", sourceName, sourceType, sceneName)
 				}
 			}
 		}

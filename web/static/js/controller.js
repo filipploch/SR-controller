@@ -83,40 +83,8 @@ socket.on('source_changed', (data) => {
 	updateSourceButton(data.scene_name, data.source_name, data.visible);
 });
 
-// Ładowanie aktualnego media dla przycisków Media1 i Reportaze1
-async function loadCurrentMediaButtons() {
-	await loadCurrentMediaButton('MEDIA', 'Media1');
-	await loadCurrentMediaButton('REPORTAZE', 'Reportaze1');
-}
-
-async function loadCurrentMediaButton(sceneName, sourceName) {
-	try {
-		const response = await fetch(`/api/episodes/current/media/scene/${sceneName}`);
-		const data = await response.json();
-		
-		const containerId = `sources-${sceneName.toLowerCase()}`;
-		const container = document.getElementById(containerId);
-		if (!container) return;
-		
-		// Znajdź przycisk dla tego źródła
-		const button = container.querySelector(`[data-source-name="${sourceName}"]`);
-		if (!button) return;
-		
-		if (data.success && data.title) {
-			// Zaktualizuj tekst przycisku na tytuł z bazy
-			button.textContent = data.title;
-			
-			// Zapisz ID media w atrybucie data
-			button.dataset.mediaId = data.media_id;
-		} else {
-			// Brak media - przywróć oryginalną nazwę
-			button.textContent = sourceName;
-			button.removeAttribute('data-media-id');
-		}
-	} catch (error) {
-		console.error(`Błąd ładowania media dla ${sceneName}:`, error);
-	}
-}
+// USUNIĘTO: loadCurrentMediaButtons() i loadCurrentMediaButton()
+// Teraz używamy nowego systemu z episode_sources przez media_modal.js
 
 function loadAllScenes() {
 	SCENES.forEach(sceneName => {
@@ -209,10 +177,15 @@ function renderSources(sceneName, sources) {
 	const reversedSources = [...sources].reverse();
 	
 	reversedSources.forEach(source => {
+		const sourceName = source.sourceName || source.source_name || 'Źródło';
+		
+		// Wrapper dla przycisku i przycisku modalu
+		const wrapper = document.createElement('div');
+		wrapper.className = 'source-button-wrapper';
+		
+		// Główny przycisk źródła
 		const button = document.createElement('button');
 		button.className = 'source-btn';
-		
-		const sourceName = source.sourceName || source.source_name || 'Źródło';
 		button.textContent = sourceName;
 		button.dataset.sceneName = sceneName;
 		button.dataset.sourceName = sourceName;
@@ -237,13 +210,31 @@ function renderSources(sceneName, sources) {
 			}
 		});
 		
-		container.appendChild(button);
+		// Przycisk otwierający modal (tylko dla Media1 i Reportaze1)
+		if (sourceName === 'Media1' || sourceName === 'Reportaze1') {
+			const modalButton = document.createElement('button');
+			modalButton.className = 'open-modal-btn';
+			modalButton.textContent = 'W';
+			modalButton.title = 'Wybierz media';
+			modalButton.onclick = (e) => {
+				e.stopPropagation();
+				openMediaModal(sourceName, sceneName);
+			};
+			
+			wrapper.appendChild(button);
+			wrapper.appendChild(modalButton);
+			container.appendChild(wrapper);
+		} else {
+			// Dla innych źródeł dodaj sam przycisk
+			container.appendChild(button);
+		}
 	});
 	
-	// Po wyrenderowaniu źródeł, załaduj aktualne media dla Media1 i Reportaze1
-	if (sceneName === 'MEDIA' || sceneName === 'REPORTAZE') {
-		const mediaSourceName = sceneName === 'MEDIA' ? 'Media1' : 'Reportaze1';
-		loadCurrentMediaButton(sceneName, mediaSourceName);
+	// USUNIĘTO: loadCurrentMediaButton - teraz używamy loadAllSourceAssignments() w media_modal.js
+	
+	// Po wyrenderowaniu przycisków, zaktualizuj ich teksty z przypisań
+	if (typeof loadAllSourceAssignments === 'function') {
+		loadAllSourceAssignments();
 	}
 }
 

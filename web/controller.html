@@ -6,6 +6,7 @@
     <title>Kontroler OBS</title>
     <link rel="stylesheet" href="/static/css/shared.css">
     <link rel="stylesheet" href="/static/css/controller.css">
+    <link rel="stylesheet" href="/static/css/media_modal.css">
 </head>
 <body>
     <div class="container">
@@ -97,7 +98,21 @@
         </div>
     </div>
 
+    <!-- Modal wyboru mediów -->
+    <div id="media-modal-overlay" class="media-modal-overlay">
+        <div class="media-modal">
+            <div class="media-modal-header">
+                <h3 id="media-modal-title">Wybierz media</h3>
+                <button id="media-modal-close" class="media-modal-close">×</button>
+            </div>
+            <div id="media-modal-body" class="media-modal-body">
+                <!-- Zawartość generowana dynamicznie -->
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/socket.io.min.js"></script>
     <script src="/static/js/controller.js"></script>
+    <script src="/static/js/media_modal.js"></script>
 </body>
 </html>
