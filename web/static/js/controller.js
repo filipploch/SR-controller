@@ -210,16 +210,27 @@ function renderSources(sceneName, sources) {
 			}
 		});
 		
-		// Przycisk otwierający modal (tylko dla Media1 i Reportaze1)
-		if (sourceName === 'Media1' || sourceName === 'Reportaze1') {
+		// Przycisk otwierający modal
+		if (sourceName === 'Media1' || sourceName === 'Reportaze1' || 
+		    sourceName === 'Media2' || sourceName === 'Reportaze2') {
 			const modalButton = document.createElement('button');
 			modalButton.className = 'open-modal-btn';
 			modalButton.textContent = 'W';
-			modalButton.title = 'Wybierz media';
-			modalButton.onclick = (e) => {
-				e.stopPropagation();
-				openMediaModal(sourceName, sceneName);
-			};
+			
+			// Różne tytuły i funkcje dla różnych źródeł
+			if (sourceName === 'Media1' || sourceName === 'Reportaze1') {
+				modalButton.title = 'Wybierz plik';
+				modalButton.onclick = (e) => {
+					e.stopPropagation();
+					openMediaModal(sourceName, sceneName);
+				};
+			} else if (sourceName === 'Media2' || sourceName === 'Reportaze2') {
+				modalButton.title = 'Wybierz grupę';
+				modalButton.onclick = (e) => {
+					e.stopPropagation();
+					openVLCGroupModal(sourceName, sceneName);
+				};
+			}
 			
 			wrapper.appendChild(button);
 			wrapper.appendChild(modalButton);

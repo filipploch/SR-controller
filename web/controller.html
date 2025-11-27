@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/static/css/shared.css">
     <link rel="stylesheet" href="/static/css/controller.css">
     <link rel="stylesheet" href="/static/css/media_modal.css">
+    <link rel="stylesheet" href="/static/css/vlc_group_modal.css">
 </head>
 <body>
     <div class="container">
@@ -111,8 +112,22 @@
         </div>
     </div>
 
+    <!-- Modal wyboru grupy VLC -->
+    <div id="vlc-group-modal-overlay" class="vlc-group-modal-overlay">
+        <div class="vlc-group-modal">
+            <div class="vlc-group-modal-header">
+                <h3 id="vlc-group-modal-title">Wybierz grupę</h3>
+                <button id="vlc-group-modal-close" class="vlc-group-modal-close">×</button>
+            </div>
+            <div id="vlc-group-modal-body" class="vlc-group-modal-body">
+                <!-- Zawartość generowana dynamicznie -->
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/socket.io.min.js"></script>
     <script src="/static/js/controller.js"></script>
     <script src="/static/js/media_modal.js"></script>
+    <script src="/static/js/vlc_group_modal.js"></script>
 </body>
 </html>

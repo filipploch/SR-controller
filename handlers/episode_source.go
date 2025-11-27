@@ -222,10 +222,10 @@ func (h *EpisodeSourceHandler) AutoAssignMediaSources(w http.ResponseWriter, r *
 	// Przypisz dla Media1
 	if assigned, mediaID, title := h.autoAssignForSource(uint(episodeID), "Media1", "MEDIA"); assigned {
 		results["Media1"] = map[string]interface{}{
-			"assigned":  true,
-			"media_id":  mediaID,
-			"title":     title,
-			"source":    "auto",
+			"assigned": true,
+			"media_id": mediaID,
+			"title":    title,
+			"source":   "auto",
 		}
 	} else {
 		results["Media1"] = map[string]interface{}{
@@ -237,10 +237,10 @@ func (h *EpisodeSourceHandler) AutoAssignMediaSources(w http.ResponseWriter, r *
 	// Przypisz dla Reportaze1
 	if assigned, mediaID, title := h.autoAssignForSource(uint(episodeID), "Reportaze1", "REPORTAZE"); assigned {
 		results["Reportaze1"] = map[string]interface{}{
-			"assigned":  true,
-			"media_id":  mediaID,
-			"title":     title,
-			"source":    "auto",
+			"assigned": true,
+			"media_id": mediaID,
+			"title":    title,
+			"source":   "auto",
 		}
 	} else {
 		results["Reportaze1"] = map[string]interface{}{
@@ -344,10 +344,10 @@ func (h *EpisodeSourceHandler) AutoAssignVLCSources(w http.ResponseWriter, r *ht
 	// Przypisz dla Media2
 	if assigned, groupID, groupName := h.autoAssignVLCForSource(uint(episodeID), "Media2", "MEDIA"); assigned {
 		results["Media2"] = map[string]interface{}{
-			"assigned":  true,
-			"group_id":  groupID,
-			"name":      groupName,
-			"source":    "auto",
+			"assigned": true,
+			"group_id": groupID,
+			"name":     groupName,
+			"source":   "auto",
 		}
 	} else {
 		results["Media2"] = map[string]interface{}{
@@ -359,10 +359,10 @@ func (h *EpisodeSourceHandler) AutoAssignVLCSources(w http.ResponseWriter, r *ht
 	// Przypisz dla Reportaze2
 	if assigned, groupID, groupName := h.autoAssignVLCForSource(uint(episodeID), "Reportaze2", "REPORTAZE"); assigned {
 		results["Reportaze2"] = map[string]interface{}{
-			"assigned":  true,
-			"group_id":  groupID,
-			"name":      groupName,
-			"source":    "auto",
+			"assigned": true,
+			"group_id": groupID,
+			"name":     groupName,
+			"source":   "auto",
 		}
 	} else {
 		results["Reportaze2"] = map[string]interface{}{
@@ -389,7 +389,7 @@ func (h *EpisodeSourceHandler) autoAssignVLCForSource(episodeID uint, sourceName
 
 	// PRIORYTET 1: Grupa systemowa (MEDIA/REPORTAZE) z ≥2 plikami
 	var systemGroup models.MediaGroup
-	err = h.DB.Preload("MediaItems").
+	err = h.DB.Preload("MediaItems.EpisodeMedia").
 		Where("episode_id = ? AND name = ? AND is_system = ?", episodeID, systemGroupName, true).
 		First(&systemGroup).Error
 
@@ -401,7 +401,7 @@ func (h *EpisodeSourceHandler) autoAssignVLCForSource(episodeID uint, sourceName
 	// PRIORYTET 2: Pierwsza grupa użytkownika z ≥2 plikami
 	if selectedGroup == nil {
 		var userGroups []models.MediaGroup
-		err = h.DB.Preload("MediaItems").
+		err = h.DB.Preload("MediaItems.EpisodeMedia").
 			Where("episode_id = ? AND is_system = ?", episodeID, false).
 			Order("\"order\" ASC").
 			Find(&userGroups).Error
@@ -425,18 +425,15 @@ func (h *EpisodeSourceHandler) autoAssignVLCForSource(episodeID uint, sourceName
 
 	// Przygotuj playlistę dla VLC Video Source
 	playlist := make([]map[string]interface{}, 0)
-	
+
 	absMediaPath, err := filepath.Abs(h.MediaPath)
 	if err != nil {
 		absMediaPath = h.MediaPath
 	}
 
 	for _, item := range selectedGroup.MediaItems {
-		// Pobierz pełne dane pliku
-		var media models.EpisodeMedia
-		if err := h.DB.First(&media, item.EpisodeMediaID).Error; err != nil {
-			continue
-		}
+		// EpisodeMedia jest już załadowane przez Preload("MediaItems.EpisodeMedia")
+		media := item.EpisodeMedia
 
 		if media.FilePath != nil && *media.FilePath != "" {
 			fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*media.FilePath))
@@ -487,3 +484,165 @@ func (h *EpisodeSourceHandler) autoAssignVLCForSource(episodeID uint, sourceName
 	return true, selectedGroup.ID, selectedGroup.Name
 }
 
+// AssignGroupToSource - POST /api/episodes/{episode_id}/sources/{source_name}/assign-group
+// Ręczne przypisanie grupy do źródła VLC Video Source
+func (h *EpisodeSourceHandler) AssignGroupToSource(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	sourceName := vars["source_name"]
+
+	var requestData struct {
+		GroupID uint `json:"group_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Pobierz grupę i sprawdź czy należy do odcinka
+	var group models.MediaGroup
+	if err := h.DB.Preload("MediaItems.EpisodeMedia").First(&group, requestData.GroupID).Error; err != nil {
+		http.Error(w, "Group not found", http.StatusNotFound)
+		return
+	}
+
+	if group.EpisodeID != uint(episodeID) {
+		http.Error(w, "Group does not belong to this episode", http.StatusForbidden)
+		return
+	}
+
+	// Sprawdź czy grupa ma ≥2 pliki
+	if len(group.MediaItems) < 2 {
+		http.Error(w, "Group must have at least 2 files for VLC Video Source", http.StatusBadRequest)
+		return
+	}
+
+	// Przygotuj playlistę dla VLC Video Source
+	playlist := make([]map[string]interface{}, 0)
+
+	absMediaPath, err := filepath.Abs(h.MediaPath)
+	if err != nil {
+		absMediaPath = h.MediaPath
+	}
+
+	for _, item := range group.MediaItems {
+		// EpisodeMedia jest już załadowane przez Preload("MediaItems.EpisodeMedia")
+		media := item.EpisodeMedia
+
+		if media.FilePath != nil && *media.FilePath != "" {
+			fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*media.FilePath))
+			playlist = append(playlist, map[string]interface{}{
+				"value": fullPath,
+			})
+		}
+	}
+
+	if len(playlist) == 0 {
+		http.Error(w, "No valid files in group", http.StatusBadRequest)
+		return
+	}
+
+	// Wczytaj playlistę do OBS (jeśli połączony)
+	if h.OBSClient != nil && h.OBSClient.IsConnected() {
+		err = h.OBSClient.SetInputSettings(sourceName, map[string]interface{}{
+			"playlist": playlist,
+			"loop":     false,
+			"shuffle":  false,
+		})
+
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to set OBS playlist: %v", err), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Zapisz przypisanie jako "manual"
+	err = models.SetEpisodeSourceGroup(h.DB, uint(episodeID), sourceName, group.ID, "manual")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to save assignment: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Wyślij broadcast
+	if h.SocketHandler != nil && h.SocketHandler.Server != nil {
+		h.SocketHandler.Server.BroadcastToNamespace("/", "source_group_assigned", map[string]interface{}{
+			"episode_id":  uint(episodeID),
+			"source_name": sourceName,
+			"group_id":    group.ID,
+			"name":        group.Name,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":      "ok",
+		"episode_id":  uint(episodeID),
+		"source_name": sourceName,
+		"group_id":    group.ID,
+		"name":        group.Name,
+	})
+}
+
+// GetGroupsForSourceModal - GET /api/episodes/{episode_id}/sources/{source_name}/groups-list
+// Pobiera listę grup z ≥2 plikami dla modalu wyboru
+func (h *EpisodeSourceHandler) GetGroupsForSourceModal(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	sourceName := vars["source_name"]
+
+	// Pobierz aktualnie przypisaną grupę (jeśli istnieje)
+	var currentGroupID *uint
+	assignment, err := models.GetEpisodeSourceAssignment(h.DB, uint(episodeID), sourceName)
+	if err == nil && assignment != nil && assignment.GroupID != nil {
+		currentGroupID = assignment.GroupID
+	}
+
+	// Pobierz wszystkie grupy dla tego odcinka z plikami
+	var groups []models.MediaGroup
+	err = h.DB.Preload("MediaItems").
+		Where("episode_id = ?", episodeID).
+		Order("is_system DESC, \"order\" ASC").
+		Find(&groups).Error
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Przygotuj odpowiedź - tylko grupy z ≥2 plikami
+	result := make([]map[string]interface{}, 0)
+
+	for _, group := range groups {
+		// Filtruj - tylko grupy z ≥2 plikami
+		if len(group.MediaItems) < 2 {
+			continue
+		}
+
+		isCurrent := currentGroupID != nil && group.ID == *currentGroupID
+
+		result = append(result, map[string]interface{}{
+			"id":         group.ID,
+			"name":       group.Name,
+			"is_system":  group.IsSystem,
+			"file_count": len(group.MediaItems),
+			"is_current": isCurrent,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"current_group_id": currentGroupID,
+		"groups":           result,
+	})
+}

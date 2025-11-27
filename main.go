@@ -221,7 +221,9 @@ func main() {
 
 	// Endpointy dla przypisań źródeł (episode_sources)
 	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/assign-media", episodeSourceHandler.AssignMediaToSource).Methods("POST")
+	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/assign-group", episodeSourceHandler.AssignGroupToSource).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/media-list", episodeSourceHandler.GetMediaForSourceModal).Methods("GET")
+	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/groups-list", episodeSourceHandler.GetGroupsForSourceModal).Methods("GET")
 	api.HandleFunc("/episodes/{episode_id}/source-assignments", episodeSourceHandler.GetSourceAssignments).Methods("GET")
 	api.HandleFunc("/episodes/{episode_id}/auto-assign-media-sources", episodeSourceHandler.AutoAssignMediaSources).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/auto-assign-vlc-sources", episodeSourceHandler.AutoAssignVLCSources).Methods("POST")
