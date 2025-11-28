@@ -215,7 +215,7 @@ function renderSources(sceneName, sources) {
 		    sourceName === 'Media2' || sourceName === 'Reportaze2') {
 			const modalButton = document.createElement('button');
 			modalButton.className = 'open-modal-btn';
-			modalButton.textContent = 'W';
+			modalButton.textContent = '▼';
 			
 			// Różne tytuły i funkcje dla różnych źródeł
 			if (sourceName === 'Media1' || sourceName === 'Reportaze1') {

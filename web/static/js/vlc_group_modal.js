@@ -63,8 +63,8 @@ function renderVLCGroupModal(data, sourceName, sceneName) {
             <div class="vlc-group-count">${group.file_count} ${group.file_count === 1 ? 'plik' : 'pliki/plików'}</div>
         `;
 
-        // Kliknięcie - przypisz grupę
-        groupDiv.onclick = () => {
+        // Dwuklik - przypisz grupę
+        groupDiv.ondblclick = () => {
             assignGroupToSource(group.id, group.name);
         };
 

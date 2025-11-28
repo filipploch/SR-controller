@@ -222,10 +222,10 @@ func (h *EpisodeSourceHandler) AutoAssignMediaSources(w http.ResponseWriter, r *
 	// Przypisz dla Media1
 	if assigned, mediaID, title := h.autoAssignForSource(uint(episodeID), "Media1", "MEDIA"); assigned {
 		results["Media1"] = map[string]interface{}{
-			"assigned": true,
-			"media_id": mediaID,
-			"title":    title,
-			"source":   "auto",
+			"assigned":  true,
+			"media_id":  mediaID,
+			"title":     title,
+			"source":    "auto",
 		}
 	} else {
 		results["Media1"] = map[string]interface{}{
@@ -237,10 +237,10 @@ func (h *EpisodeSourceHandler) AutoAssignMediaSources(w http.ResponseWriter, r *
 	// Przypisz dla Reportaze1
 	if assigned, mediaID, title := h.autoAssignForSource(uint(episodeID), "Reportaze1", "REPORTAZE"); assigned {
 		results["Reportaze1"] = map[string]interface{}{
-			"assigned": true,
-			"media_id": mediaID,
-			"title":    title,
-			"source":   "auto",
+			"assigned":  true,
+			"media_id":  mediaID,
+			"title":     title,
+			"source":    "auto",
 		}
 	} else {
 		results["Reportaze1"] = map[string]interface{}{
@@ -344,10 +344,10 @@ func (h *EpisodeSourceHandler) AutoAssignVLCSources(w http.ResponseWriter, r *ht
 	// Przypisz dla Media2
 	if assigned, groupID, groupName := h.autoAssignVLCForSource(uint(episodeID), "Media2", "MEDIA"); assigned {
 		results["Media2"] = map[string]interface{}{
-			"assigned": true,
-			"group_id": groupID,
-			"name":     groupName,
-			"source":   "auto",
+			"assigned":  true,
+			"group_id":  groupID,
+			"name":      groupName,
+			"source":    "auto",
 		}
 	} else {
 		results["Media2"] = map[string]interface{}{
@@ -359,10 +359,10 @@ func (h *EpisodeSourceHandler) AutoAssignVLCSources(w http.ResponseWriter, r *ht
 	// Przypisz dla Reportaze2
 	if assigned, groupID, groupName := h.autoAssignVLCForSource(uint(episodeID), "Reportaze2", "REPORTAZE"); assigned {
 		results["Reportaze2"] = map[string]interface{}{
-			"assigned": true,
-			"group_id": groupID,
-			"name":     groupName,
-			"source":   "auto",
+			"assigned":  true,
+			"group_id":  groupID,
+			"name":      groupName,
+			"source":    "auto",
 		}
 	} else {
 		results["Reportaze2"] = map[string]interface{}{
@@ -425,7 +425,7 @@ func (h *EpisodeSourceHandler) autoAssignVLCForSource(episodeID uint, sourceName
 
 	// Przygotuj playlistę dla VLC Video Source
 	playlist := make([]map[string]interface{}, 0)
-
+	
 	absMediaPath, err := filepath.Abs(h.MediaPath)
 	if err != nil {
 		absMediaPath = h.MediaPath
