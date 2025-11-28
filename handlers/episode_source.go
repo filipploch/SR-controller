@@ -222,10 +222,10 @@ func (h *EpisodeSourceHandler) AutoAssignMediaSources(w http.ResponseWriter, r *
 	// Przypisz dla Media1
 	if assigned, mediaID, title := h.autoAssignForSource(uint(episodeID), "Media1", "MEDIA"); assigned {
 		results["Media1"] = map[string]interface{}{
-			"assigned":  true,
-			"media_id":  mediaID,
-			"title":     title,
-			"source":    "auto",
+			"assigned": true,
+			"media_id": mediaID,
+			"title":    title,
+			"source":   "auto",
 		}
 	} else {
 		results["Media1"] = map[string]interface{}{
@@ -237,10 +237,10 @@ func (h *EpisodeSourceHandler) AutoAssignMediaSources(w http.ResponseWriter, r *
 	// Przypisz dla Reportaze1
 	if assigned, mediaID, title := h.autoAssignForSource(uint(episodeID), "Reportaze1", "REPORTAZE"); assigned {
 		results["Reportaze1"] = map[string]interface{}{
-			"assigned":  true,
-			"media_id":  mediaID,
-			"title":     title,
-			"source":    "auto",
+			"assigned": true,
+			"media_id": mediaID,
+			"title":    title,
+			"source":   "auto",
 		}
 	} else {
 		results["Reportaze1"] = map[string]interface{}{
@@ -344,10 +344,10 @@ func (h *EpisodeSourceHandler) AutoAssignVLCSources(w http.ResponseWriter, r *ht
 	// Przypisz dla Media2
 	if assigned, groupID, groupName := h.autoAssignVLCForSource(uint(episodeID), "Media2", "MEDIA"); assigned {
 		results["Media2"] = map[string]interface{}{
-			"assigned":  true,
-			"group_id":  groupID,
-			"name":      groupName,
-			"source":    "auto",
+			"assigned": true,
+			"group_id": groupID,
+			"name":     groupName,
+			"source":   "auto",
 		}
 	} else {
 		results["Media2"] = map[string]interface{}{
@@ -359,10 +359,10 @@ func (h *EpisodeSourceHandler) AutoAssignVLCSources(w http.ResponseWriter, r *ht
 	// Przypisz dla Reportaze2
 	if assigned, groupID, groupName := h.autoAssignVLCForSource(uint(episodeID), "Reportaze2", "REPORTAZE"); assigned {
 		results["Reportaze2"] = map[string]interface{}{
-			"assigned":  true,
-			"group_id":  groupID,
-			"name":      groupName,
-			"source":    "auto",
+			"assigned": true,
+			"group_id": groupID,
+			"name":     groupName,
+			"source":   "auto",
 		}
 	} else {
 		results["Reportaze2"] = map[string]interface{}{
@@ -425,7 +425,7 @@ func (h *EpisodeSourceHandler) autoAssignVLCForSource(episodeID uint, sourceName
 
 	// Przygotuj playlistę dla VLC Video Source
 	playlist := make([]map[string]interface{}, 0)
-	
+
 	absMediaPath, err := filepath.Abs(h.MediaPath)
 	if err != nil {
 		absMediaPath = h.MediaPath
@@ -645,4 +645,81 @@ func (h *EpisodeSourceHandler) GetGroupsForSourceModal(w http.ResponseWriter, r 
 		"current_group_id": currentGroupID,
 		"groups":           result,
 	})
+}
+
+// AutoAssignCameraTypes - POST /api/episodes/{episode_id}/auto-assign-camera-types
+// Automatycznie przypisuje typy kamer do Kamera1-4 według kolejności (order)
+func (h *EpisodeSourceHandler) AutoAssignCameraTypes(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	// Mapowanie: source_name → order typu kamery
+	cameraMapping := map[string]int{
+		"Kamera1": 1, // Centralna
+		"Kamera2": 2, // Prowadzący
+		"Kamera3": 3, // Goście
+		"Kamera4": 4, // Dodatkowa
+	}
+
+	results := make(map[string]interface{})
+
+	for sourceName, order := range cameraMapping {
+		// Sprawdź czy już jest przypisanie
+		existing, err := models.GetEpisodeSourceAssignment(h.DB, uint(episodeID), sourceName)
+		if err == nil && existing != nil && existing.AssignedBy == "manual" {
+			// Manual assignment - nie nadpisuj
+			results[sourceName] = map[string]interface{}{
+				"assigned": false,
+				"reason":   "manual assignment exists",
+			}
+			continue
+		}
+
+		// Znajdź typ kamery według kolejności
+		var cameraType models.CameraType
+		err = h.DB.Where("\"order\" = ?", order).First(&cameraType).Error
+		if err != nil {
+			results[sourceName] = map[string]interface{}{
+				"assigned": false,
+				"reason":   fmt.Sprintf("camera type with order %d not found", order),
+			}
+			continue
+		}
+
+		// Przypisz typ kamery
+		err = models.SetEpisodeSourceCameraType(h.DB, uint(episodeID), sourceName, cameraType.ID, "auto")
+		if err != nil {
+			results[sourceName] = map[string]interface{}{
+				"assigned": false,
+				"reason":   err.Error(),
+			}
+			continue
+		}
+
+		// Sukces
+		results[sourceName] = map[string]interface{}{
+			"assigned":         true,
+			"camera_type_id":   cameraType.ID,
+			"camera_type_name": cameraType.Name,
+			"source":           "auto",
+		}
+
+		// Broadcast WebSocket
+		if h.SocketHandler != nil {
+			h.SocketHandler.Server.BroadcastToNamespace("/", "source_camera_assigned", map[string]interface{}{
+				"episode_id":       uint(episodeID),
+				"source_name":      sourceName,
+				"camera_type_id":   cameraType.ID,
+				"camera_type_name": cameraType.Name,
+				"is_disabled":      false,
+			})
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
 }

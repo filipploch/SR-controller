@@ -239,6 +239,7 @@ func main() {
 	api.HandleFunc("/episodes/{episode_id}/source-assignments", episodeSourceHandler.GetSourceAssignments).Methods("GET")
 	api.HandleFunc("/episodes/{episode_id}/auto-assign-media-sources", episodeSourceHandler.AutoAssignMediaSources).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/auto-assign-vlc-sources", episodeSourceHandler.AutoAssignVLCSources).Methods("POST")
+	api.HandleFunc("/episodes/{episode_id}/auto-assign-camera-types", episodeSourceHandler.AutoAssignCameraTypes).Methods("POST")
 
 	log.Println("========================================")
 	log.Println("Serwer działa: http://localhost:8080")

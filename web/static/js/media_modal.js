@@ -238,6 +238,24 @@ socket.on('source_group_assigned', (data) => {
     updateSourceButtonText(data.source_name, data.name);
 });
 
+// Nasłuchuj na broadcast przypisania typu kamery
+socket.on('source_camera_assigned', (data) => {
+    console.log('Otrzymano broadcast przypisania kamery:', data);
+
+    // Sprawdź czy dotyczy aktualnego odcinka
+    if (currentEpisodeId && data.episode_id !== currentEpisodeId) {
+        console.log('Ignoruję - inny odcinek');
+        return;
+    }
+
+    // Zaktualizuj przycisk kamery
+    updateCameraButtonState(
+        data.source_name,
+        data.camera_type_name || data.source_name,
+        data.is_disabled || false
+    );
+});
+
 // Załaduj wszystkie przypisania przy starcie
 async function loadAllSourceAssignments() {
     if (!currentEpisodeId) {
@@ -253,7 +271,17 @@ async function loadAllSourceAssignments() {
 
         // Zaktualizuj przyciski
         for (const [sourceName, assignment] of Object.entries(assignments)) {
-            updateSourceButtonText(sourceName, assignment.button_text);
+            if (assignment.type === 'camera') {
+                // Kamera - użyj updateCameraButtonState
+                updateCameraButtonState(
+                    sourceName,
+                    assignment.button_text,
+                    assignment.is_disabled || false
+                );
+            } else {
+                // Media/Group - użyj updateSourceButtonText
+                updateSourceButtonText(sourceName, assignment.button_text);
+            }
         }
     } catch (error) {
         console.error('Błąd ładowania przypisań źródeł:', error);
@@ -314,6 +342,55 @@ async function autoAssignVLCSources() {
     }
 }
 
+// Automatyczne przypisanie typów kamer (Kamera1-4)
+async function autoAssignCameraTypes() {
+    if (!currentEpisodeId) {
+        console.log('Brak aktualnego odcinka - pomijam automatyczne przypisanie kamer');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/episodes/${currentEpisodeId}/auto-assign-camera-types`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+
+        console.log('Wynik automatycznego przypisania kamer:', result);
+
+        // Zaktualizuj przyciski dla przypisanych kamer
+        ['Kamera1', 'Kamera2', 'Kamera3', 'Kamera4'].forEach(sourceName => {
+            if (result[sourceName] && result[sourceName].assigned) {
+                updateCameraButtonState(
+                    sourceName,
+                    result[sourceName].camera_type_name,
+                    false // nie wyłączona
+                );
+            }
+        });
+    } catch (error) {
+        console.error('Błąd automatycznego przypisania kamer:', error);
+    }
+}
+
+// Aktualizuj stan przycisku kamery (tekst + disabled)
+function updateCameraButtonState(sourceName, cameraTypeName, isDisabled) {
+    const button = document.querySelector(`[data-source-name="${sourceName}"]`);
+    if (button) {
+        if (isDisabled) {
+            // Wyłączona
+            button.textContent = sourceName; // "Kamera1"
+            button.disabled = true;
+            button.classList.add('camera-disabled');
+        } else {
+            // Włączona
+            button.textContent = cameraTypeName || sourceName; // "Centralna" lub "Kamera1"
+            button.disabled = false;
+            button.classList.remove('camera-disabled');
+        }
+    }
+}
+
+
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
     // Zamknij modal po kliknięciu na overlay
@@ -333,7 +410,9 @@ socket.on('connect', () => {
         // Automatycznie przypisz Media1/Reportaze1 i Media2/Reportaze2
         // (renderSources wywoła loadAllSourceAssignments() po wyrenderowaniu przycisków)
         autoAssignMediaSources().then(() => {
-            autoAssignVLCSources();
+            autoAssignVLCSources().then(() => {
+                autoAssignCameraTypes();
+            });
         });
     });
 });

@@ -766,6 +766,62 @@ func SetEpisodeSourceGroup(db *gorm.DB, episodeID uint, sourceName string, group
 	return db.Save(&episodeSource).Error
 }
 
+// SetEpisodeSourceCameraType ustawia przypisanie typu kamery do źródła
+func SetEpisodeSourceCameraType(db *gorm.DB, episodeID uint, sourceName string, cameraTypeID uint, assignedBy string) error {
+	var episodeSource EpisodeSource
+
+	// Sprawdź czy wpis już istnieje
+	result := db.Where("episode_id = ? AND source_name = ?", episodeID, sourceName).First(&episodeSource)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		// Utwórz nowy wpis
+		episodeSource = EpisodeSource{
+			EpisodeID:    episodeID,
+			SourceName:   sourceName,
+			CameraTypeID: &cameraTypeID,
+			AssignedBy:   assignedBy,
+		}
+		return db.Create(&episodeSource).Error
+	}
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	// Zaktualizuj istniejący wpis
+	episodeSource.CameraTypeID = &cameraTypeID
+	episodeSource.AssignedBy = assignedBy
+	return db.Save(&episodeSource).Error
+}
+
+// DisableEpisodeSourceCamera wyłącza kamerę (CameraTypeID=NULL, AssignedBy=manual)
+func DisableEpisodeSourceCamera(db *gorm.DB, episodeID uint, sourceName string) error {
+	var episodeSource EpisodeSource
+
+	// Sprawdź czy wpis już istnieje
+	result := db.Where("episode_id = ? AND source_name = ?", episodeID, sourceName).First(&episodeSource)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		// Utwórz nowy wpis jako wyłączony
+		episodeSource = EpisodeSource{
+			EpisodeID:    episodeID,
+			SourceName:   sourceName,
+			CameraTypeID: nil,
+			AssignedBy:   "manual",
+		}
+		return db.Create(&episodeSource).Error
+	}
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	// Zaktualizuj istniejący wpis - wyłącz
+	episodeSource.CameraTypeID = nil
+	episodeSource.AssignedBy = "manual"
+	return db.Save(&episodeSource).Error
+}
+
 // GetEpisodeSourceAssignment pobiera przypisanie dla źródła
 func GetEpisodeSourceAssignment(db *gorm.DB, episodeID uint, sourceName string) (*EpisodeSource, error) {
 	var episodeSource EpisodeSource
@@ -817,6 +873,29 @@ func GetAllEpisodeSourceAssignments(db *gorm.DB, episodeID uint) (map[string]int
 					"button_text": group.Name,
 					"assigned_by": es.AssignedBy,
 				}
+			}
+		} else if es.CameraTypeID != nil {
+			// Pobierz nazwę typu kamery
+			var cameraType CameraType
+			if err := db.First(&cameraType, *es.CameraTypeID).Error; err == nil {
+				assignments[es.SourceName] = map[string]interface{}{
+					"type":             "camera",
+					"camera_type_id":   *es.CameraTypeID,
+					"camera_type_name": cameraType.Name,
+					"button_text":      cameraType.Name,
+					"assigned_by":      es.AssignedBy,
+					"is_disabled":      false,
+				}
+			}
+		} else if es.AssignedBy == "manual" && (es.SourceName == "Kamera1" || es.SourceName == "Kamera2" || es.SourceName == "Kamera3" || es.SourceName == "Kamera4") {
+			// CameraTypeID=NULL + AssignedBy=manual = wyłączona kamera
+			assignments[es.SourceName] = map[string]interface{}{
+				"type":             "camera",
+				"camera_type_id":   nil,
+				"camera_type_name": nil,
+				"button_text":      es.SourceName, // "Kamera1"
+				"assigned_by":      "manual",
+				"is_disabled":      true,
 			}
 		}
 	}

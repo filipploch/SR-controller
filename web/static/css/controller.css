@@ -212,5 +212,17 @@
     border-color: #ffa500;
 }
 
+/* Wyłączona kamera */
+.source-btn.camera-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.05);
+    color: #666;
+}
+
+.source-btn:disabled {
+    pointer-events: none;
+}
+
 /* Kolory dla różnych scen */
 .scene-panel[data-scene="KAMERY"] h3 { color: #4fc3f7; }
