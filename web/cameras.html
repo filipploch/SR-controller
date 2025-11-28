@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typy Kamer - SR Controller</title>
+    <link rel="stylesheet" href="/static/css/shared.css">
+    <style>
+        .content {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 8px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .panel-header h2 {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #aaa;
+        }
+
+        .list-item {
+            padding: 6px 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            margin-bottom: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+        }
+
+        .list-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .list-item.system {
+            background: rgba(76, 175, 80, 0.1);
+            border-left: 3px solid #4CAF50;
+        }
+
+        .list-item-info {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .list-item-name {
+            font-weight: 500;
+        }
+
+        .list-item-badge {
+            background: rgba(76, 175, 80, 0.3);
+            color: #4CAF50;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 8px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .list-item-order {
+            color: #666;
+            font-size: 9px;
+            margin-right: 8px;
+        }
+
+        .list-item-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .info-panel {
+            flex: 1.5;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .info-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .info-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .info-text {
+            font-size: 11px;
+            color: #888;
+            line-height: 1.6;
+            max-width: 400px;
+        }
+
+        .info-list {
+            list-style: none;
+            padding: 0;
+            margin: 15px 0;
+            text-align: left;
+        }
+
+        .info-list li {
+            padding: 6px 0;
+            font-size: 10px;
+            color: #aaa;
+        }
+
+        .info-list li:before {
+            content: "✓ ";
+            color: #4CAF50;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Typy Kamer</h1>
+            <div class="status">
+                <a href="/settings" style="text-decoration: none; color: inherit; margin-right: 15px;">
+                    <div class="status-item">
+                        <span>⚙️ Ustawienia</span>
+                    </div>
+                </a>
+                <div class="status-item">
+                    <div class="status-dot connected"></div>
+                    <span>System</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Panel typów kamer -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Typy Kamer</h2>
+                    <button class="btn btn-primary btn-small" onclick="openCameraTypeModal()">+ Dodaj Typ</button>
+                </div>
+                <div class="scrollable" id="cameraTypesContainer">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+            </div>
+
+            <!-- Panel informacyjny -->
+            <div class="info-panel">
+                <div class="info-icon">📹</div>
+                <div class="info-title">Typy Kamer</div>
+                <div class="info-text">
+                    Zarządzaj typami kamer używanych w systemie kontrolera OBS.
+                </div>
+                <ul class="info-list">
+                    <li><strong>Typy systemowe</strong> - predefiniowane, nie można edytować ani usunąć</li>
+                    <li><strong>Typy użytkownika</strong> - można dodawać, edytować i usuwać</li>
+                    <li><strong>Kolejność</strong> - określa domyślne przypisanie do kamer (Kamera1-4)</li>
+                    <li><strong>Auto-przypisanie</strong> - Kamera1→Centralna, Kamera2→Prowadzący, itd.</li>
+                </ul>
+                <div class="info-text" style="margin-top: 15px; font-size: 9px; color: #666;">
+                    Typy systemowe: Centralna, Prowadzący, Goście, Dodatkowa
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal dodawania/edycji typu -->
+    <div class="modal" id="cameraTypeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Nowy Typ Kamery</h2>
+                <button type="button" class="modal-close" onclick="closeCameraTypeModal()">&times;</button>
+            </div>
+            <form id="cameraTypeForm" onsubmit="saveCameraType(event)">
+                <input type="hidden" id="cameraTypeId">
+                
+                <div class="form-group">
+                    <label for="cameraTypeName">Nazwa typu *</label>
+                    <input type="text" class="form-control" id="cameraTypeName" required>
+                    <small style="color: #888; font-size: 9px;">Np. "Tablica", "PTZ Sala", "Mobilna"</small>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeCameraTypeModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/cameras.js"></script>
+</body>
+</html>

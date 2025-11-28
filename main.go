@@ -61,6 +61,7 @@ func main() {
 	guestTypeHandler := handlers.NewGuestTypeHandler(db)
 	guestHandler := handlers.NewGuestHandler(db)
 	episodeGuestHandler := handlers.NewEpisodeGuestHandler(db)
+	cameraTypeHandler := handlers.NewCameraTypeHandler(db) // NOWE
 	sceneHandler := handlers.NewSceneHandler(db)
 	mediaGroupHandler := handlers.NewMediaGroupHandler(db)
 	settingsHandler := handlers.NewSettingsHandler(db)
@@ -114,6 +115,10 @@ func main() {
 
 	router.HandleFunc("/guests", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./web/guests.html")
+	})
+
+	router.HandleFunc("/cameras", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./web/cameras.html")
 	})
 
 	router.HandleFunc("/overlay", func(w http.ResponseWriter, r *http.Request) {
@@ -171,6 +176,13 @@ func main() {
 	api.HandleFunc("/guest-types/{id}", guestTypeHandler.GetGuestType).Methods("GET")
 	api.HandleFunc("/guest-types/{id}", guestTypeHandler.UpdateGuestType).Methods("PUT")
 	api.HandleFunc("/guest-types/{id}", guestTypeHandler.DeleteGuestType).Methods("DELETE")
+
+	// API REST dla CameraType
+	api.HandleFunc("/camera-types", cameraTypeHandler.GetCameraTypes).Methods("GET")
+	api.HandleFunc("/camera-types", cameraTypeHandler.CreateCameraType).Methods("POST")
+	api.HandleFunc("/camera-types/{id}", cameraTypeHandler.GetCameraType).Methods("GET")
+	api.HandleFunc("/camera-types/{id}", cameraTypeHandler.UpdateCameraType).Methods("PUT")
+	api.HandleFunc("/camera-types/{id}", cameraTypeHandler.DeleteCameraType).Methods("DELETE")
 
 	api.HandleFunc("/guests", guestHandler.GetGuests).Methods("GET")
 	api.HandleFunc("/guests", guestHandler.CreateGuest).Methods("POST")

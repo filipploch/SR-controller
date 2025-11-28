@@ -93,6 +93,16 @@ type Guest struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// CameraType reprezentuje typ kamery (np. Centralna, Prowadzący, Goście, Dodatkowa)
+type CameraType struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	Name      string    `gorm:"size:100;uniqueIndex;not null" json:"name"`
+	Order     int       `gorm:"not null" json:"order"`                   // Kolejność wyświetlania i auto-przypisania
+	IsSystem  bool      `gorm:"not null;default:false" json:"is_system"` // true = systemowy (nie można edytować/usunąć)
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // EpisodeGuest reprezentuje przypisanie gościa do odcinka
 type EpisodeGuest struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
@@ -154,12 +164,12 @@ type Source struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	SceneID     uint      `gorm:"index;not null" json:"scene_id"`
 	Scene       Scene     `gorm:"foreignKey:SceneID" json:"scene"`
-	Name        string    `gorm:"size:200;not null" json:"name"`        // Nazwa źródła w OBS
+	Name        string    `gorm:"size:200;not null" json:"name"`                          // Nazwa źródła w OBS
 	SourceType  string    `gorm:"size:100;not null;default:'UNKNOWN'" json:"source_type"` // Typ źródła z OBS
-	SourceOrder int       `gorm:"default:0" json:"source_order"`        // Domyślna kolejność
-	IsVisible   bool      `gorm:"default:false" json:"is_visible"`      // Stan użytkownika (dla mikrofonów)
-	IconURL     *string   `gorm:"size:500" json:"icon_url"`             // Ikona dla przycisku (nullable)
-	Color       string    `gorm:"size:20" json:"color"`                 // Kolor przycisku (hex)
+	SourceOrder int       `gorm:"default:0" json:"source_order"`                          // Domyślna kolejność
+	IsVisible   bool      `gorm:"default:false" json:"is_visible"`                        // Stan użytkownika (dla mikrofonów)
+	IconURL     *string   `gorm:"size:500" json:"icon_url"`                               // Ikona dla przycisku (nullable)
+	Color       string    `gorm:"size:20" json:"color"`                                   // Kolor przycisku (hex)
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -171,23 +181,26 @@ type Source struct {
 // - Mikrofony: StaffID lub GuestID (osoba)
 // - Kamery: PresetID (preset kamery) - przyszłość
 type EpisodeSource struct {
-	ID         uint      `gorm:"primaryKey" json:"id"`
-	EpisodeID  uint      `gorm:"index;not null" json:"episode_id"`
-	Episode    Episode   `gorm:"foreignKey:EpisodeID" json:"episode"`
-	SourceName string    `gorm:"size:200;not null" json:"source_name"` // "Media1", "Media2", "Kamera1", "Mikrofon1"
-	
+	ID         uint    `gorm:"primaryKey" json:"id"`
+	EpisodeID  uint    `gorm:"index;not null" json:"episode_id"`
+	Episode    Episode `gorm:"foreignKey:EpisodeID" json:"episode"`
+	SourceName string  `gorm:"size:200;not null" json:"source_name"` // "Media1", "Media2", "Kamera1", "Mikrofon1"
+
 	// Przypisania (tylko jedno wypełnione w zależności od typu źródła)
-	MediaID    *uint     `gorm:"index" json:"media_id"`   // Dla Media1/Reportaze1 → ID pliku
-	GroupID    *uint     `gorm:"index" json:"group_id"`   // Dla Media2/Reportaze2 → ID grupy
-	StaffID    *uint     `gorm:"index" json:"staff_id"`   // Dla mikrofonów → ID prowadzącego
-	GuestID    *uint     `gorm:"index" json:"guest_id"`   // Dla mikrofonów → ID gościa
-	PresetID   *uint     `gorm:"index" json:"preset_id"`  // Dla kamer → ID presetu (przyszłość)
-	
+	MediaID      *uint `gorm:"index" json:"media_id"`       // Dla Media1/Reportaze1 → ID pliku
+	GroupID      *uint `gorm:"index" json:"group_id"`       // Dla Media2/Reportaze2 → ID grupy
+	CameraTypeID *uint `gorm:"index" json:"camera_type_id"` // Dla kamer → ID typu kamery
+	StaffID      *uint `gorm:"index" json:"staff_id"`       // Dla mikrofonów → ID prowadzącego
+	GuestID      *uint `gorm:"index" json:"guest_id"`       // Dla mikrofonów → ID gościa
+
+	// Relacje
+	CameraType *CameraType `gorm:"foreignKey:CameraTypeID" json:"camera_type"`
+
 	// Metadane
-	AssignedBy string    `gorm:"size:50;default:'manual'" json:"assigned_by"` // "auto" lub "manual"
-	
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	AssignedBy string `gorm:"size:50;default:'auto'" json:"assigned_by"` // "auto" lub "manual"
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // EpisodeMedia reprezentuje media (reportaże, filmy) przypisane do odcinka
@@ -219,6 +232,7 @@ func InitDB(db *gorm.DB) error {
 		&GuestType{},
 		&Guest{},
 		&EpisodeGuest{},
+		&CameraType{}, // NOWE: typy kamer
 		&MediaGroup{},
 		&Scene{},
 		&Source{},
@@ -228,6 +242,11 @@ func InitDB(db *gorm.DB) error {
 	)
 
 	if err != nil {
+		return err
+	}
+
+	// Seed systemowych typów kamer
+	if err := SeedCameraTypes(db); err != nil {
 		return err
 	}
 
@@ -803,4 +822,28 @@ func GetAllEpisodeSourceAssignments(db *gorm.DB, episodeID uint) (map[string]int
 	}
 
 	return assignments, nil
+}
+
+// SeedCameraTypes tworzy 4 predefiniowane systemowe typy kamer
+func SeedCameraTypes(db *gorm.DB) error {
+	systemTypes := []CameraType{
+		{Name: "Centralna", Order: 1, IsSystem: true},
+		{Name: "Prowadzący", Order: 2, IsSystem: true},
+		{Name: "Goście", Order: 3, IsSystem: true},
+		{Name: "Dodatkowa", Order: 4, IsSystem: true},
+	}
+
+	for _, cameraType := range systemTypes {
+		var existing CameraType
+		result := db.Where("name = ?", cameraType.Name).First(&existing)
+
+		if result.Error == gorm.ErrRecordNotFound {
+			// Nie istnieje - utwórz
+			if err := db.Create(&cameraType).Error; err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
