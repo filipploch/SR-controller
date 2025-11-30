@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -822,6 +823,71 @@ func DisableEpisodeSourceCamera(db *gorm.DB, episodeID uint, sourceName string) 
 	return db.Save(&episodeSource).Error
 }
 
+// SetEpisodeSourceMicrophone ustawia przypisanie osoby (staff/guest) do mikrofonu
+func SetEpisodeSourceMicrophone(db *gorm.DB, episodeID uint, sourceName string, personID uint, personType string, assignedBy string) error {
+	var episodeSource EpisodeSource
+
+	// Sprawdź czy wpis już istnieje
+	result := db.Where("episode_id = ? AND source_name = ?", episodeID, sourceName).First(&episodeSource)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		// Utwórz nowy wpis
+		episodeSource = EpisodeSource{
+			EpisodeID:  episodeID,
+			SourceName: sourceName,
+			AssignedBy: assignedBy,
+		}
+
+		if personType == "staff" {
+			episodeSource.StaffID = &personID
+			episodeSource.GuestID = nil
+		} else {
+			episodeSource.GuestID = &personID
+			episodeSource.StaffID = nil
+		}
+
+		return db.Create(&episodeSource).Error
+	}
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	// Zaktualizuj istniejący wpis
+	if personType == "staff" {
+		episodeSource.StaffID = &personID
+		episodeSource.GuestID = nil
+	} else {
+		episodeSource.GuestID = &personID
+		episodeSource.StaffID = nil
+	}
+	episodeSource.AssignedBy = assignedBy
+	return db.Save(&episodeSource).Error
+}
+
+// UnassignEpisodeSourceMicrophone usuwa przypisanie osoby z mikrofonu
+func UnassignEpisodeSourceMicrophone(db *gorm.DB, episodeID uint, sourceName string) error {
+	var episodeSource EpisodeSource
+
+	// Sprawdź czy wpis już istnieje
+	result := db.Where("episode_id = ? AND source_name = ?", episodeID, sourceName).First(&episodeSource)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		// Jeśli nie istnieje, nie ma co usuwać
+		return nil
+	}
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	// Wyczyść przypisanie
+	episodeSource.StaffID = nil
+	episodeSource.GuestID = nil
+	episodeSource.AssignedBy = "manual"
+	return db.Save(&episodeSource).Error
+}
+
 // GetEpisodeSourceAssignment pobiera przypisanie dla źródła
 func GetEpisodeSourceAssignment(db *gorm.DB, episodeID uint, sourceName string) (*EpisodeSource, error) {
 	var episodeSource EpisodeSource
@@ -871,6 +937,28 @@ func GetAllEpisodeSourceAssignments(db *gorm.DB, episodeID uint) (map[string]int
 					"type":        "group",
 					"group_id":    *es.GroupID,
 					"button_text": group.Name,
+					"assigned_by": es.AssignedBy,
+				}
+			}
+		} else if es.StaffID != nil {
+			// Pobierz dane osoby
+			var staff Staff
+			if err := db.First(&staff, *es.StaffID).Error; err == nil {
+				assignments[es.SourceName] = map[string]interface{}{
+					"type":        "staff",
+					"staff_id":    *es.StaffID,
+					"button_text": fmt.Sprintf("%s %s", staff.FirstName, staff.LastName),
+					"assigned_by": es.AssignedBy,
+				}
+			}
+		} else if es.GuestID != nil {
+			// Pobierz dane osoby
+			var guest Guest
+			if err := db.First(&guest, *es.GuestID).Error; err == nil {
+				assignments[es.SourceName] = map[string]interface{}{
+					"type":        "guest",
+					"staff_id":    *es.GuestID,
+					"button_text": fmt.Sprintf("%s %s", guest.FirstName, guest.LastName),
 					"assigned_by": es.AssignedBy,
 				}
 			}

@@ -339,21 +339,21 @@ func (c *Client) SetInputVolume(inputName string, inputVolumeDb float64) error {
 }
 
 // GetInputVolume pobiera aktualną głośność źródła audio (w dB)
-func (c *Client) GetInputVolume(inputName string) (float64, error) {
-	resp, err := c.Request("GetInputVolume", map[string]interface{}{
-		"inputName": inputName,
-	})
-	if err != nil {
-		return 0, err
-	}
-	// Parsuj response
-	if responseData, ok := resp["responseData"].(map[string]interface{}); ok {
-		if volumeDb, ok := responseData["inputVolumeDb"].(float64); ok {
-			return volumeDb, nil
-		}
-	}
-	return 0, fmt.Errorf("invalid response format: missing inputVolumeDb")
-}
+// func (c *Client) GetInputVolume(inputName string) (float64, error) {
+// 	resp, err := c.Request("GetInputVolume", map[string]interface{}{
+// 		"inputName": inputName,
+// 	})
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	// Parsuj response
+// 	if responseData, ok := resp["responseData"].(map[string]interface{}); ok {
+// 		if volumeDb, ok := responseData["inputVolumeDb"].(float64); ok {
+// 			return volumeDb, nil
+// 		}
+// 	}
+// 	return 0, fmt.Errorf("invalid response format: missing inputVolumeDb")
+// }
 
 // OnEvent rejestruje handler dla określonego typu eventu
 func (c *Client) OnEvent(eventType string, handler func(map[string]interface{})) {

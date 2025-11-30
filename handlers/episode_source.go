@@ -877,3 +877,209 @@ func (h *EpisodeSourceHandler) GetCameraTypesForModal(w http.ResponseWriter, r *
 		"camera_types":           result,
 	})
 }
+
+// GetMicrophonePeopleList zwraca listę Staff + Guests dla modalu mikrofonów
+func (h *EpisodeSourceHandler) GetMicrophonePeopleList(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	sourceName := vars["source_name"]
+
+	// Pobierz aktualne przypisanie
+	var currentPersonID *uint
+	var currentPersonType string
+	existing, err := models.GetEpisodeSourceAssignment(h.DB, uint(episodeID), sourceName)
+	if err == nil && existing != nil {
+		if existing.StaffID != nil {
+			currentPersonID = existing.StaffID
+			currentPersonType = "staff"
+		} else if existing.GuestID != nil {
+			currentPersonID = existing.GuestID
+			currentPersonType = "guest"
+		}
+	}
+
+	// Pobierz listę Staff dla tego odcinka
+	var episodeStaff []models.EpisodeStaff
+	h.DB.Where("episode_id = ?", episodeID).
+		Preload("Staff").
+		Preload("StaffTypes").
+		Order("staff_id ASC").
+		Find(&episodeStaff)
+
+	// Pobierz listę Guests dla tego odcinka
+	var episodeGuests []models.EpisodeGuest
+	h.DB.Where("episode_id = ?", episodeID).
+		Preload("Guest.GuestType").
+		Order("guest_id ASC").
+		Find(&episodeGuests)
+
+	// Pobierz wszystkie przypisania mikrofonów w tym odcinku
+	var episodeSources []models.EpisodeSource
+	h.DB.Where("episode_id = ? AND (staff_id IS NOT NULL OR guest_id IS NOT NULL)", episodeID).
+		Find(&episodeSources)
+
+	// Mapa: person_type:person_id → []source_names
+	assignedMicrophones := make(map[string][]string)
+	for _, es := range episodeSources {
+		if es.StaffID != nil {
+			key := fmt.Sprintf("staff:%d", *es.StaffID)
+			assignedMicrophones[key] = append(assignedMicrophones[key], es.SourceName)
+		} else if es.GuestID != nil {
+			key := fmt.Sprintf("guest:%d", *es.GuestID)
+			assignedMicrophones[key] = append(assignedMicrophones[key], es.SourceName)
+		}
+	}
+
+	// Przygotuj listę Staff
+	staffList := make([]map[string]interface{}, 0)
+	for _, es := range episodeStaff {
+		key := fmt.Sprintf("staff:%d", es.StaffID)
+		microphones := assignedMicrophones[key]
+		isCurrent := currentPersonType == "staff" && currentPersonID != nil && *currentPersonID == es.StaffID
+
+		// Pobierz nazwę typu z pierwszego typu (jeśli istnieje)
+		var staffTypeName string
+		if len(es.StaffTypes) > 0 {
+			var staffType models.StaffType
+			if err := h.DB.First(&staffType, es.StaffTypes[0].StaffTypeID).Error; err == nil {
+				staffTypeName = staffType.Name
+			}
+		}
+
+		staffList = append(staffList, map[string]interface{}{
+			"id":                   es.StaffID,
+			"type":                 "staff",
+			"first_name":           es.Staff.FirstName,
+			"last_name":            es.Staff.LastName,
+			"full_name":            es.Staff.FirstName + " " + es.Staff.LastName,
+			"staff_type_name":      staffTypeName,
+			"is_current":           isCurrent,
+			"assigned_microphones": microphones,
+		})
+	}
+
+	// Przygotuj listę Guests
+	guestList := make([]map[string]interface{}, 0)
+	for _, eg := range episodeGuests {
+		key := fmt.Sprintf("guest:%d", eg.GuestID)
+		microphones := assignedMicrophones[key]
+		isCurrent := currentPersonType == "guest" && currentPersonID != nil && *currentPersonID == eg.GuestID
+
+		guestList = append(guestList, map[string]interface{}{
+			"id":                   eg.GuestID,
+			"type":                 "guest",
+			"first_name":           eg.Guest.FirstName,
+			"last_name":            eg.Guest.LastName,
+			"full_name":            eg.Guest.FirstName + " " + eg.Guest.LastName,
+			"guest_type_name":      eg.Guest.GuestType.Name,
+			"is_current":           isCurrent,
+			"assigned_microphones": microphones,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"current_person_id":   currentPersonID,
+		"current_person_type": currentPersonType,
+		"staff":               staffList,
+		"guests":              guestList,
+	})
+}
+
+// AssignMicrophonePerson przypisuje osobę (staff/guest) do mikrofonu
+func (h *EpisodeSourceHandler) AssignMicrophonePerson(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	sourceName := vars["source_name"]
+
+	var data struct {
+		PersonID   *uint  `json:"person_id"`   // null = usuń przypisanie
+		PersonType string `json:"person_type"` // "staff" lub "guest"
+	}
+
+	fmt.Print("<episode_source.go> data: ", data)
+
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Jeśli PersonID == null, usuń przypisanie
+	if data.PersonID == nil {
+		if err := models.UnassignEpisodeSourceMicrophone(h.DB, uint(episodeID), sourceName); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Broadcast WebSocket
+		if h.SocketHandler != nil {
+			h.SocketHandler.Server.BroadcastToNamespace("/", "source_microphone_assigned", map[string]interface{}{
+				"episode_id":  episodeID,
+				"source_name": sourceName,
+				"person_id":   nil,
+				"person_type": "",
+				"person_name": sourceName, // Przywróć oryginalną nazwę
+			})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+		return
+	}
+
+	// Walidacja: sprawdź czy osoba istnieje w odcinku
+	var personName string
+	if data.PersonType == "staff" {
+		var episodeStaff models.EpisodeStaff
+		if err := h.DB.Where("episode_id = ? AND staff_id = ?", episodeID, *data.PersonID).
+			Preload("Staff").First(&episodeStaff).Error; err != nil {
+			http.Error(w, "Staff not found in this episode", http.StatusNotFound)
+			return
+		}
+		personName = episodeStaff.Staff.LastName + " " + episodeStaff.Staff.FirstName
+	} else if data.PersonType == "guest" {
+		var episodeGuest models.EpisodeGuest
+		if err := h.DB.Where("episode_id = ? AND guest_id = ?", episodeID, *data.PersonID).
+			Preload("Guest").First(&episodeGuest).Error; err != nil {
+			http.Error(w, "Guest not found in this episode", http.StatusNotFound)
+			return
+		}
+		personName = episodeGuest.Guest.LastName + " " + episodeGuest.Guest.FirstName
+	} else {
+		http.Error(w, "Invalid person_type", http.StatusBadRequest)
+		return
+	}
+
+	// Przypisz osobę do mikrofonu
+	if err := models.SetEpisodeSourceMicrophone(h.DB, uint(episodeID), sourceName, *data.PersonID, data.PersonType, "manual"); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Broadcast WebSocket
+	if h.SocketHandler != nil {
+		h.SocketHandler.Server.BroadcastToNamespace("/", "source_microphone_assigned", map[string]interface{}{
+			"episode_id":  episodeID,
+			"source_name": sourceName,
+			"person_id":   *data.PersonID,
+			"person_type": data.PersonType,
+			"person_name": personName,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": fmt.Sprintf("Assigned %s to %s", personName, sourceName),
+	})
+}

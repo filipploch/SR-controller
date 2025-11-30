@@ -248,6 +248,8 @@ func main() {
 	api.HandleFunc("/episodes/{episode_id}/auto-assign-camera-types", episodeSourceHandler.AutoAssignCameraTypes).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/assign-camera-type", episodeSourceHandler.AssignCameraTypeToSource).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/camera-types-list", episodeSourceHandler.GetCameraTypesForModal).Methods("GET")
+	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/microphone-people-list", episodeSourceHandler.GetMicrophonePeopleList).Methods("GET")
+	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/assign-microphone-person", episodeSourceHandler.AssignMicrophonePerson).Methods("POST")
 
 	log.Println("========================================")
 	log.Println("Serwer działa: http://localhost:8080")

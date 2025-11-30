@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="/static/css/media_modal.css">
     <link rel="stylesheet" href="/static/css/vlc_group_modal.css">
     <link rel="stylesheet" href="/static/css/camera_type_modal.css">
+    <link rel="stylesheet" href="/static/css/microphone_modal.css">
 </head>
 <body>
     <div class="container">
@@ -139,11 +140,25 @@
         </div>
     </div>
 
+    <!-- Modal przypisania osoby do mikrofonu -->
+    <div id="microphone-modal-overlay" class="microphone-modal-overlay">
+        <div class="microphone-modal">
+            <div class="microphone-modal-header">
+                <h3 id="microphone-modal-title">Przypisz osobę</h3>
+                <button id="microphone-modal-close">×</button>
+            </div>
+            <div id="microphone-modal-body">
+                <!-- Zawartość generowana dynamicznie -->
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/socket.io.min.js"></script>
     <script src="/static/js/controller.js"></script>
     <script src="/static/js/media_modal.js"></script>
     <script src="/static/js/vlc_group_modal.js"></script>
     <script src="/static/js/camera_type_modal.js"></script>
+    <script src="/static/js/microphone_modal.js"></script>
     <script src="/static/js/volume_control.js"></script>
 </body>
 </html>

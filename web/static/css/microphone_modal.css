@@ -1,0 +1,170 @@
+/* microphone_modal.css - Style modalu przypisania mikrofonu */
+
+.microphone-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.microphone-modal-overlay.active {
+    display: flex;
+}
+
+.microphone-modal {
+    background: #1e1e1e;
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 400px;
+    max-width: 500px;
+    max-height: 80vh;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.microphone-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.microphone-modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+}
+
+#microphone-modal-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+#microphone-modal-close:hover {
+    color: #fff;
+}
+
+#microphone-modal-body {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* Nagłówki sekcji (Staff / Guests) */
+.microphone-section-header {
+    font-size: 11px;
+    font-weight: 700;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 12px 0 8px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    margin-top: 8px;
+}
+
+.microphone-section-header:first-child {
+    border-top: none;
+    margin-top: 0;
+    padding-top: 0;
+}
+
+/* Element osoby */
+.microphone-person-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    margin: 4px 0;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.microphone-person-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.microphone-person-item.active {
+    background: rgba(30, 144, 255, 0.2);
+    border-color: #1e90ff;
+}
+
+.microphone-person-item.active:hover {
+    background: rgba(30, 144, 255, 0.3);
+}
+
+.microphone-person-item span:first-child {
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
+}
+
+/* Licznik przypisanych mikrofonów */
+.microphone-count {
+    font-size: 11px;
+    color: #888;
+    font-weight: 400;
+}
+
+.microphone-person-item.active .microphone-count {
+    color: #a0cfff;
+}
+
+/* Opcja "Usuń przypisanie" */
+.microphone-person-item.unassign-option {
+    background: rgba(239, 83, 80, 0.1);
+    border-color: rgba(239, 83, 80, 0.3);
+    margin-top: 16px;
+}
+
+.microphone-person-item.unassign-option:hover {
+    background: rgba(239, 83, 80, 0.2);
+    border-color: rgba(239, 83, 80, 0.5);
+}
+
+.microphone-person-item.unassign-option span:first-child {
+    color: #ef5350;
+}
+
+/* Scrollbar */
+#microphone-modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+#microphone-modal-body::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+#microphone-modal-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+#microphone-modal-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}

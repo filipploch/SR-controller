@@ -1,5 +1,26 @@
 // volume_control.js - Kontrola głośności źródeł audio
 
+// ===== KONWERSJA LOGARYTMICZNA (jak OBS) =====
+
+// Konwertuj dB na procent suwaka (0-100, skala logarytmiczna OBS)
+function dbToSliderPosition(db) {
+    if (db <= -96) return 0;
+    if (db >= 0) return 100;
+    
+    // Formuła OBS: db = 60 * log10(percent / 100)
+    // Odwrotnie: percent = 100 * 10^(db / 60)
+    return Math.pow(10, db / 60) * 100;
+}
+
+// Konwertuj procent suwaka (0-100) na dB (skala logarytmiczna OBS)
+function sliderPositionToDb(position) {
+    if (position <= 0) return -96;
+    if (position >= 100) return 0;
+    
+    // Formuła OBS: db = 60 * log10(percent / 100)
+    return 60 * Math.log10(position / 100);
+}
+
 // Nasłuchuj na zmiany głośności z OBS (zewnętrzne zmiany)
 socket.on('volume_changed', (data) => {
     console.log('Volume changed in OBS:', data);
@@ -10,8 +31,8 @@ socket.on('volume_changed', (data) => {
     );
     
     if (slider) {
-        // Zaktualizuj suwak bez triggerowania eventu
-        slider.value = data.volume_db;
+        // Konwertuj dB na pozycję suwaka (logarytmicznie)
+        slider.value = dbToSliderPosition(data.volume_db);
         
         // Oznacz wyciszone
         if (data.volume_db <= -100) {
@@ -20,7 +41,7 @@ socket.on('volume_changed', (data) => {
             slider.classList.remove('muted');
         }
         
-        console.log(`Updated slider for ${data.source_name} to ${data.volume_db}dB`);
+        console.log(`Updated slider for ${data.source_name} to ${data.volume_db}dB (position: ${slider.value})`);
     }
 });
 
@@ -43,9 +64,10 @@ async function getSourceVolume(sourceName) {
     return new Promise((resolve) => {
         socket.emit('get_input_volume', sourceName, (response) => {
             const data = JSON.parse(response);
-            console.log("data:", data);
-            if (data.success && data) {
-                resolve(data);
+            console.log("data (getSourceVolume):", data);
+            if (data.success && data.data) {
+                
+                resolve(data.data.volume_db);
             } else {
                 console.error('Failed to get volume:', data.error || 'unknown error');
                 resolve(-10); // Domyślnie -10dB
@@ -125,30 +147,29 @@ function renderSourceWithVolume(source, sceneName, container) {
     const slider = document.createElement('input');
     slider.type = 'range';
     slider.className = 'volume-slider';
-    slider.min = -100;  // -100 dB (prawie cisza)
-    slider.max = 0;     // 0 dB (max)
-    slider.value = -10; // Domyślnie -10dB
+    slider.min = 0;      // Pozycja: 0% (cicho, -96dB)
+    slider.max = 100;    // Pozycja: 100% (max, 0dB)
+    slider.value = dbToSliderPosition(-10);  // Domyślnie -10dB (pozycja ~63%)
+    setSourceVolume(sourceName, -10);
     slider.dataset.sourceName = sourceName;
     
-    // Pobierz aktualną głośność z OBS
-    try {
-        const currentVol = getSourceVolume(sourceName);
-        var currentVolume = currentVol.data['volume_db']
-        slider.value = currentVolume;
-
-        console.log("currentVolume: ", currentVolume);
+    // // Pobierz aktualną głośność z cache/OBS (teraz instant dzięki cache!)
+    // getSourceVolume(sourceName).then(currentVolumeDb => {
+    //     // Konwertuj dB na pozycję suwaka (logarytmicznie)
+    //     slider.value = dbToSliderPosition(currentVolumeDb);
         
-        // Oznacz wyciszone
-        if (currentVolume <= -100) {
-            slider.classList.add('muted');
-        }
-    } catch (error) {
-        console.error('Error getting initial volume:', error);
-    }
+    //     // Oznacz wyciszone
+    //     if (currentVolumeDb <= -100) {
+    //         slider.classList.add('muted');
+    //     }
+    // }).catch(error => {
+    //     console.error('Error getting initial volume:', error);
+    // });
     
-    // Event - zmiana głośności
+    // Event - zmiana głośności (podczas przesuwania)
     slider.addEventListener('input', (e) => {
-        const volumeDb = parseFloat(e.target.value);
+        const sliderPosition = parseFloat(e.target.value);
+        const volumeDb = sliderPositionToDb(sliderPosition);
         
         // Oznacz wyciszone
         if (volumeDb <= -100) {
@@ -160,7 +181,8 @@ function renderSourceWithVolume(source, sceneName, container) {
     
     // Event - po zakończeniu zmiany (mouseup/touchend)
     slider.addEventListener('change', (e) => {
-        const volumeDb = parseFloat(e.target.value);
+        const sliderPosition = parseFloat(e.target.value);
+        const volumeDb = sliderPositionToDb(sliderPosition);
         setSourceVolume(sourceName, volumeDb);
     });
     
@@ -186,8 +208,4 @@ function shouldHaveVolumeSlider(sourceName, sceneName) {
     return false;
 }
 
-// Placeholder: Otwórz modal przypisania osoby do mikrofonu
-function openMicrophoneAssignModal(sourceName, sceneName) {
-    alert(`Modal przypisania osoby do mikrofonu: ${sourceName}\n(Do zaimplementowania w następnym kroku)`);
-    // TODO: Implementacja modalu przypisania Staff/Guest do mikrofonu
-}
+// Funkcja openMicrophoneAssignModal() jest w microphone_modal.js

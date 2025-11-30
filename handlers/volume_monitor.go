@@ -14,6 +14,10 @@ type VolumeMonitor struct {
 	// Mapa: source_name → ostatnia wartość ustawiona przez nas
 	ourChanges    map[string]float64
 	ourChangesMux sync.RWMutex
+
+	// Cache: source_name → ostatnia znana głośność z OBS
+	cachedVolumes map[string]float64
+	cacheMu       sync.RWMutex
 }
 
 func NewVolumeMonitor(obsClient *obsws.Client, socketHandler *SocketHandler) *VolumeMonitor {
@@ -21,6 +25,7 @@ func NewVolumeMonitor(obsClient *obsws.Client, socketHandler *SocketHandler) *Vo
 		OBSClient:     obsClient,
 		SocketHandler: socketHandler,
 		ourChanges:    make(map[string]float64),
+		cachedVolumes: make(map[string]float64),
 	}
 }
 
@@ -43,11 +48,16 @@ func (vm *VolumeMonitor) Start() {
 			// To nasza zmiana - ignoruj (nie broadcastuj)
 			log.Printf("Volume change ignored (our change): %s = %.2f dB", inputName, volumeDb)
 			vm.clearOurChange(inputName)
+
+			// Ale AKTUALIZUJ CACHE (nasza zmiana też jest prawidłowa)
+			vm.UpdateCache(inputName, volumeDb)
 			return
 		}
 
 		// To zewnętrzna zmiana (z OBS UI) - broadcast do frontendu
-		log.Printf("Volume changed externally: %s = %.2f dB", inputName, volumeDb)
+
+		// Aktualizuj cache
+		vm.UpdateCache(inputName, volumeDb)
 
 		if vm.SocketHandler != nil {
 			vm.SocketHandler.Server.BroadcastToNamespace("/", "volume_changed", map[string]interface{}{
@@ -96,6 +106,23 @@ func (vm *VolumeMonitor) clearOurChange(sourceName string) {
 	vm.ourChangesMux.Lock()
 	defer vm.ourChangesMux.Unlock()
 	delete(vm.ourChanges, sourceName)
+}
+
+// GetCachedVolume pobiera głośność z cache (jeśli istnieje)
+func (vm *VolumeMonitor) GetCachedVolume(sourceName string) (float64, bool) {
+	vm.cacheMu.RLock()
+	defer vm.cacheMu.RUnlock()
+
+	volume, exists := vm.cachedVolumes[sourceName]
+	return volume, exists
+}
+
+// UpdateCache aktualizuje cache głośności
+func (vm *VolumeMonitor) UpdateCache(sourceName string, volumeDb float64) {
+	vm.cacheMu.Lock()
+	defer vm.cacheMu.Unlock()
+
+	vm.cachedVolumes[sourceName] = volumeDb
 }
 
 // Stop zatrzymuje volume monitor
