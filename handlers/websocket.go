@@ -15,6 +15,7 @@ type SocketHandler struct {
 	Server         *socketio.Server
 	DB             *gorm.DB
 	OBSClient      *obsws.Client
+	VolumeMonitor  *VolumeMonitor                    // Monitor zmian głośności
 	vlcAssignments map[uint]map[string]VLCAssignment // episode_id -> (source_name -> assignment)
 	mu             sync.RWMutex
 }
@@ -59,6 +60,8 @@ func NewSocketHandler(db *gorm.DB, obsClient *obsws.Client) (*SocketHandler, err
 	server.OnEvent("/", "sync_source_order", handler.handleSyncSourceOrder)
 	server.OnEvent("/", "mute_all_microphones", handler.handleMuteAllMicrophones)
 	server.OnEvent("/", "restore_microphones", handler.handleRestoreMicrophones)
+	server.OnEvent("/", "set_input_volume", handler.handleSetInputVolume)
+	server.OnEvent("/", "get_input_volume", handler.handleGetInputVolume)
 
 	go server.Serve()
 
@@ -474,4 +477,57 @@ func (h *SocketHandler) GetVLCAssignments(episodeID uint) map[string]interface{}
 	}
 
 	return result
+}
+
+// handleSetInputVolume - ustaw głośność źródła audio
+func (h *SocketHandler) handleSetInputVolume(s socketio.Conn, msg string) string {
+	var data struct {
+		InputName     string  `json:"inputName"`
+		InputVolumeDb float64 `json:"inputVolumeDb"`
+	}
+
+	if err := json.Unmarshal([]byte(msg), &data); err != nil {
+		return h.errorResponse("Invalid data")
+	}
+
+	if h.OBSClient == nil {
+		return h.errorResponse("OBS not connected")
+	}
+
+	// Zarejestruj że TO NASZA ZMIANA (dla VolumeMonitor)
+	if h.VolumeMonitor != nil {
+		h.VolumeMonitor.RegisterOurChange(data.InputName, data.InputVolumeDb)
+	}
+
+	// Ustaw głośność w OBS
+	err := h.OBSClient.SetInputVolume(data.InputName, data.InputVolumeDb)
+	if err != nil {
+		log.Printf("Error setting volume for %s: %v", data.InputName, err)
+		return h.errorResponse(err.Error())
+	}
+
+	log.Printf("Volume set: %s = %.2f dB", data.InputName, data.InputVolumeDb)
+
+	return h.successResponse(map[string]interface{}{
+		"source_name": data.InputName,
+		"volume_db":   data.InputVolumeDb,
+	})
+}
+
+// handleGetInputVolume - pobierz aktualną głośność źródła audio
+func (h *SocketHandler) handleGetInputVolume(s socketio.Conn, inputName string) string {
+	if h.OBSClient == nil {
+		return h.errorResponse("OBS not connected")
+	}
+
+	volumeDb, err := h.OBSClient.GetInputVolume(inputName)
+	if err != nil {
+		log.Printf("Error getting volume for %s: %v", inputName, err)
+		return h.errorResponse(err.Error())
+	}
+
+	return h.successResponse(map[string]interface{}{
+		"source_name": inputName,
+		"volume_db":   volumeDb,
+	})
 }

@@ -226,3 +226,87 @@
 
 /* Kolory dla różnych scen */
 .scene-panel[data-scene="KAMERY"] h3 { color: #4fc3f7; }
+/* ===== SUWAKI GŁOŚNOŚCI ===== */
+
+/* Wrapper przycisku + suwaka */
+.source-with-volume {
+    display: flex;
+    flex-direction: column;
+    /* gap: 2px; */
+    margin-bottom: 3px;
+}
+
+/* Przycisk - kompaktowy z suwakiem */
+.source-btn.with-volume {
+    padding: 4px 8px 2px 8px;
+    height: 24px;
+    font-size: 10px;
+}
+
+/* Kontener suwaka */
+.volume-slider-container {
+    /* height: 16px; */
+    display: flex;
+    /* align-items: center; */
+    /* gap: 4px; */
+    /* padding: 0 4px; */
+}
+
+/* Suwak głośności */
+.volume-slider {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    /* background: rgba(255, 255, 255, 0.1); */
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #667eea;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+    background: #7c94f5;
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: #667eea;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    transition: background 0.2s;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+    background: #7c94f5;
+}
+
+/* Label głośności */
+.volume-label {
+    font-size: 8px;
+    color: #888;
+    min-width: 30px;
+    text-align: right;
+    user-select: none;
+}
+
+/* Zmiana koloru suwaka dla wyciszonych */
+.volume-slider.muted::-webkit-slider-thumb {
+    background: #e74c3c;
+}
+
+.volume-slider.muted::-moz-range-thumb {
+    background: #e74c3c;
+}

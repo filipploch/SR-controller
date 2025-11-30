@@ -162,7 +162,7 @@ function saveSourceOrder(sceneName) {
 	});
 }
 
-function renderSources(sceneName, sources) {
+async function renderSources(sceneName, sources) {
 	const containerId = `sources-${sceneName.toLowerCase()}`;
 	const container = document.getElementById(containerId);
 	
@@ -176,8 +176,16 @@ function renderSources(sceneName, sources) {
 	
 	const reversedSources = [...sources].reverse();
 	
-	reversedSources.forEach(source => {
+	for (const source of reversedSources) {
 		const sourceName = source.sourceName || source.source_name || 'Źródło';
+		
+		// Sprawdź czy źródło powinno mieć suwak głośności
+		if (shouldHaveVolumeSlider(sourceName, sceneName)) {
+			// Renderuj z suwakiem
+			const wrapper = renderSourceWithVolume(source, sceneName, container);
+			container.appendChild(wrapper);
+			continue;
+		}
 		
 		// Wrapper dla przycisku i przycisku modalu
 		const wrapper = document.createElement('div');
@@ -212,7 +220,9 @@ function renderSources(sceneName, sources) {
 		
 		// Przycisk otwierający modal
 		if (sourceName === 'Media1' || sourceName === 'Reportaze1' || 
-		    sourceName === 'Media2' || sourceName === 'Reportaze2') {
+		    sourceName === 'Media2' || sourceName === 'Reportaze2' ||
+		    sourceName === 'Kamera1' || sourceName === 'Kamera2' || 
+		    sourceName === 'Kamera3' || sourceName === 'Kamera4') {
 			const modalButton = document.createElement('button');
 			modalButton.className = 'open-modal-btn';
 			modalButton.textContent = '▼';
@@ -230,6 +240,12 @@ function renderSources(sceneName, sources) {
 					e.stopPropagation();
 					openVLCGroupModal(sourceName, sceneName);
 				};
+			} else if (sourceName.startsWith('Kamera')) {
+				modalButton.title = 'Wybierz typ kamery';
+				modalButton.onclick = (e) => {
+					e.stopPropagation();
+					openCameraTypeModal(sourceName, sceneName);
+				};
 			}
 			
 			wrapper.appendChild(button);
@@ -239,7 +255,7 @@ function renderSources(sceneName, sources) {
 			// Dla innych źródeł dodaj sam przycisk
 			container.appendChild(button);
 		}
-	});
+	}
 	
 	// USUNIĘTO: loadCurrentMediaButton - teraz używamy loadAllSourceAssignments() w media_modal.js
 	

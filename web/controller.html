@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/static/css/controller.css">
     <link rel="stylesheet" href="/static/css/media_modal.css">
     <link rel="stylesheet" href="/static/css/vlc_group_modal.css">
+    <link rel="stylesheet" href="/static/css/camera_type_modal.css">
 </head>
 <body>
     <div class="container">
@@ -125,9 +126,24 @@
         </div>
     </div>
 
+    <!-- Modal wyboru typu kamery -->
+    <div id="camera-type-modal-overlay" class="camera-type-modal-overlay">
+        <div class="camera-type-modal">
+            <div class="camera-type-modal-header">
+                <h3 id="camera-type-modal-title">Wybierz typ kamery</h3>
+                <button id="camera-type-modal-close" class="camera-type-modal-close">×</button>
+            </div>
+            <div id="camera-type-modal-body" class="camera-type-modal-body">
+                <!-- Zawartość generowana dynamicznie -->
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/socket.io.min.js"></script>
     <script src="/static/js/controller.js"></script>
     <script src="/static/js/media_modal.js"></script>
     <script src="/static/js/vlc_group_modal.js"></script>
+    <script src="/static/js/camera_type_modal.js"></script>
+    <script src="/static/js/volume_control.js"></script>
 </body>
 </html>

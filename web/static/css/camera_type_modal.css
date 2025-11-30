@@ -1,0 +1,158 @@
+/* ===== MODAL WYBORU TYPU KAMERY ===== */
+
+.camera-type-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.camera-type-modal-overlay.active {
+    display: flex;
+}
+
+.camera-type-modal {
+    background: #2a2a2a;
+    border: 2px solid #555;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 450px;
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.camera-type-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    border-bottom: 1px solid #444;
+    background: #333;
+    border-radius: 6px 6px 0 0;
+}
+
+.camera-type-modal-header h3 {
+    margin: 0;
+    color: #fff;
+    font-size: 16px;
+}
+
+.camera-type-modal-close {
+    background: transparent;
+    border: none;
+    color: #aaa;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.camera-type-modal-close:hover {
+    color: #fff;
+}
+
+.camera-type-modal-body {
+    padding: 10px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.camera-type-item {
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.camera-type-item:hover {
+    background: #3a3a3a;
+    border-color: #777;
+    transform: translateX(3px);
+}
+
+.camera-type-item.active {
+    font-weight: bold;
+    color: #fff;
+    background: #1976D2;
+    border-color: #1976D2;
+}
+
+.camera-type-item.active:hover {
+    background: #1565C0;
+}
+
+.camera-type-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #2a2a2a;
+}
+
+.camera-type-item.disabled:hover {
+    background: #2a2a2a;
+    border-color: #555;
+    transform: none;
+}
+
+.camera-type-item.disable-option {
+    background: rgba(239, 83, 80, 0.1);
+    border-color: rgba(239, 83, 80, 0.4);
+    margin-top: 10px;
+}
+
+.camera-type-item.disable-option:hover {
+    background: rgba(239, 83, 80, 0.2);
+    border-color: #EF5350;
+}
+
+.camera-type-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.camera-type-icon {
+    font-size: 16px;
+}
+
+.camera-type-name {
+    font-size: 13px;
+    color: #ccc;
+}
+
+.camera-type-item.active .camera-type-name {
+    color: #fff;
+}
+
+.camera-type-order {
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.no-types {
+    padding: 20px;
+    text-align: center;
+    color: #888;
+    font-style: italic;
+    font-size: 13px;
+}

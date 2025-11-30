@@ -52,6 +52,12 @@ func main() {
 	}
 	log.Println("Socket.IO OK")
 
+	// Inicjalizacja Volume Monitor
+	volumeMonitor := handlers.NewVolumeMonitor(obsClient, socketHandler)
+	socketHandler.VolumeMonitor = volumeMonitor
+	volumeMonitor.Start()
+	log.Println("Volume Monitor OK")
+
 	// Inicjalizacja handlerów
 	seasonHandler := handlers.NewSeasonHandler(db)
 	episodeHandler := handlers.NewEpisodeHandler(db)
@@ -240,6 +246,8 @@ func main() {
 	api.HandleFunc("/episodes/{episode_id}/auto-assign-media-sources", episodeSourceHandler.AutoAssignMediaSources).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/auto-assign-vlc-sources", episodeSourceHandler.AutoAssignVLCSources).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/auto-assign-camera-types", episodeSourceHandler.AutoAssignCameraTypes).Methods("POST")
+	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/assign-camera-type", episodeSourceHandler.AssignCameraTypeToSource).Methods("POST")
+	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/camera-types-list", episodeSourceHandler.GetCameraTypesForModal).Methods("GET")
 
 	log.Println("========================================")
 	log.Println("Serwer działa: http://localhost:8080")

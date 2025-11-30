@@ -723,3 +723,157 @@ func (h *EpisodeSourceHandler) AutoAssignCameraTypes(w http.ResponseWriter, r *h
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)
 }
+
+// AssignCameraTypeToSource - POST /api/episodes/{episode_id}/sources/{source_name}/assign-camera-type
+// Ręczne przypisanie typu kamery do źródła
+func (h *EpisodeSourceHandler) AssignCameraTypeToSource(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	sourceName := vars["source_name"]
+
+	var data struct {
+		CameraTypeID *uint `json:"camera_type_id"` // null = wyłącz kamerę
+	}
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Jeśli camera_type_id = null → wyłącz kamerę
+	if data.CameraTypeID == nil {
+		err := models.DisableEpisodeSourceCamera(h.DB, uint(episodeID), sourceName)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Broadcast WebSocket
+		if h.SocketHandler != nil {
+			h.SocketHandler.Server.BroadcastToNamespace("/", "source_camera_assigned", map[string]interface{}{
+				"episode_id":       uint(episodeID),
+				"source_name":      sourceName,
+				"camera_type_id":   nil,
+				"camera_type_name": nil,
+				"is_disabled":      true,
+			})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":     true,
+			"is_disabled": true,
+		})
+		return
+	}
+
+	// Walidacja: typ kamery istnieje
+	var cameraType models.CameraType
+	if err := h.DB.First(&cameraType, *data.CameraTypeID).Error; err != nil {
+		http.Error(w, "Camera type not found", http.StatusNotFound)
+		return
+	}
+
+	// Walidacja: typ nie jest już przypisany do innej kamery w tym odcinku
+	var existingAssignment models.EpisodeSource
+	result := h.DB.Where("episode_id = ? AND camera_type_id = ? AND source_name != ?",
+		episodeID, *data.CameraTypeID, sourceName).First(&existingAssignment)
+
+	if result.Error == nil {
+		// Ten typ jest już przypisany do innej kamery
+		http.Error(w, fmt.Sprintf("Camera type '%s' is already assigned to %s",
+			cameraType.Name, existingAssignment.SourceName), http.StatusConflict)
+		return
+	}
+
+	// Przypisz typ kamery
+	err = models.SetEpisodeSourceCameraType(h.DB, uint(episodeID), sourceName, *data.CameraTypeID, "manual")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Broadcast WebSocket
+	if h.SocketHandler != nil {
+		h.SocketHandler.Server.BroadcastToNamespace("/", "source_camera_assigned", map[string]interface{}{
+			"episode_id":       uint(episodeID),
+			"source_name":      sourceName,
+			"camera_type_id":   *data.CameraTypeID,
+			"camera_type_name": cameraType.Name,
+			"is_disabled":      false,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":          true,
+		"camera_type_id":   cameraType.ID,
+		"camera_type_name": cameraType.Name,
+	})
+}
+
+// GetCameraTypesForModal - GET /api/episodes/{episode_id}/sources/{source_name}/camera-types-list
+// Zwraca listę typów kamer dla modalu wyboru
+func (h *EpisodeSourceHandler) GetCameraTypesForModal(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	sourceName := vars["source_name"]
+
+	// Pobierz aktualne przypisanie
+	var currentCameraTypeID *uint
+	existing, err := models.GetEpisodeSourceAssignment(h.DB, uint(episodeID), sourceName)
+	if err == nil && existing != nil {
+		currentCameraTypeID = existing.CameraTypeID
+	}
+
+	// Pobierz wszystkie typy kamer
+	var cameraTypes []models.CameraType
+	if err := h.DB.Order("\"order\" ASC").Find(&cameraTypes).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Pobierz wszystkie przypisania w tym odcinku
+	var episodeSources []models.EpisodeSource
+	h.DB.Where("episode_id = ? AND camera_type_id IS NOT NULL", episodeID).Find(&episodeSources)
+
+	// Mapa: camera_type_id → source_name (które kamery mają które typy)
+	assignedTypes := make(map[uint]string)
+	for _, es := range episodeSources {
+		if es.CameraTypeID != nil && es.SourceName != sourceName {
+			assignedTypes[*es.CameraTypeID] = es.SourceName
+		}
+	}
+
+	// Przygotuj wynik
+	result := make([]map[string]interface{}, 0)
+	for _, ct := range cameraTypes {
+		assignedTo := assignedTypes[ct.ID]
+		isCurrent := currentCameraTypeID != nil && *currentCameraTypeID == ct.ID
+
+		result = append(result, map[string]interface{}{
+			"id":          ct.ID,
+			"name":        ct.Name,
+			"order":       ct.Order,
+			"is_system":   ct.IsSystem,
+			"is_assigned": assignedTo != "",
+			"assigned_to": assignedTo,
+			"is_current":  isCurrent,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"current_camera_type_id": currentCameraTypeID,
+		"camera_types":           result,
+	})
+}

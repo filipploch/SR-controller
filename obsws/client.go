@@ -11,13 +11,15 @@ import (
 
 // Client reprezentuje klienta OBS-WebSocket
 type Client struct {
-	conn      *websocket.Conn
-	mu        sync.Mutex
-	callbacks map[string]chan map[string]interface{}
-	requestID int
-	address   string
-	reconnect bool
-	connected bool
+	conn          *websocket.Conn
+	mu            sync.Mutex
+	callbacks     map[string]chan map[string]interface{}
+	eventHandlers map[string][]func(map[string]interface{}) // Handlery eventów
+	eventMu       sync.RWMutex                              // Mutex dla eventów
+	requestID     int
+	address       string
+	reconnect     bool
+	connected     bool
 }
 
 // Message reprezentuje wiadomość OBS-WebSocket
@@ -29,11 +31,12 @@ type Message struct {
 // NewClient tworzy nowego klienta OBS-WebSocket
 func NewClient(address string) (*Client, error) {
 	client := &Client{
-		callbacks: make(map[string]chan map[string]interface{}),
-		requestID: 1,
-		address:   address,
-		reconnect: true,
-		connected: false,
+		callbacks:     make(map[string]chan map[string]interface{}),
+		eventHandlers: make(map[string][]func(map[string]interface{})),
+		requestID:     1,
+		address:       address,
+		reconnect:     true,
+		connected:     false,
 	}
 
 	if err := client.connect(); err != nil {
@@ -118,6 +121,15 @@ func (c *Client) receiveMessages() {
 					delete(c.callbacks, requestID)
 				}
 				c.mu.Unlock()
+			}
+		}
+
+		// Obsługa eventów (op code 5)
+		if msg.Op == 5 {
+			if eventData, ok := msg.D["eventData"].(map[string]interface{}); ok {
+				if eventType, ok := msg.D["eventType"].(string); ok {
+					c.triggerEvent(eventType, eventData)
+				}
 			}
 		}
 	}
@@ -315,6 +327,59 @@ func (c *Client) SetInputSettings(inputName string, inputSettings map[string]int
 		"overlay":       false,
 	})
 	return err
+}
+
+// SetInputVolume ustawia głośność źródła audio (w dB)
+func (c *Client) SetInputVolume(inputName string, inputVolumeDb float64) error {
+	_, err := c.Request("SetInputVolume", map[string]interface{}{
+		"inputName":     inputName,
+		"inputVolumeDb": inputVolumeDb,
+	})
+	return err
+}
+
+// GetInputVolume pobiera aktualną głośność źródła audio (w dB)
+func (c *Client) GetInputVolume(inputName string) (float64, error) {
+	resp, err := c.Request("GetInputVolume", map[string]interface{}{
+		"inputName": inputName,
+	})
+	if err != nil {
+		return 0, err
+	}
+	// Parsuj response
+	if responseData, ok := resp["responseData"].(map[string]interface{}); ok {
+		if volumeDb, ok := responseData["inputVolumeDb"].(float64); ok {
+			return volumeDb, nil
+		}
+	}
+	return 0, fmt.Errorf("invalid response format: missing inputVolumeDb")
+}
+
+// OnEvent rejestruje handler dla określonego typu eventu
+func (c *Client) OnEvent(eventType string, handler func(map[string]interface{})) {
+	c.eventMu.Lock()
+	defer c.eventMu.Unlock()
+
+	if c.eventHandlers[eventType] == nil {
+		c.eventHandlers[eventType] = make([]func(map[string]interface{}), 0)
+	}
+
+	c.eventHandlers[eventType] = append(c.eventHandlers[eventType], handler)
+	log.Printf("Registered handler for event: %s", eventType)
+}
+
+// triggerEvent wywołuje wszystkie handlery dla danego eventu
+func (c *Client) triggerEvent(eventType string, eventData map[string]interface{}) {
+	c.eventMu.RLock()
+	handlers := c.eventHandlers[eventType]
+	c.eventMu.RUnlock()
+
+	if len(handlers) > 0 {
+		// Wywołaj wszystkie handlery w osobnych goroutines
+		for _, handler := range handlers {
+			go handler(eventData)
+		}
+	}
 }
 
 // Close zamyka połączenie
