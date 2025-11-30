@@ -77,11 +77,15 @@ func (h *EpisodeSourceHandler) AssignMediaToSource(w http.ResponseWriter, r *htt
 		// Zbuduj pełną ścieżkę
 		fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*media.FilePath))
 
+		playlist := make([]map[string]interface{}, 0)
+		playlist = append(playlist, map[string]interface{}{
+			"value": fullPath,
+		})
 		// Ustaw plik w źródle Media Source
 		err = h.OBSClient.SetInputSettings(sourceName, map[string]interface{}{
-			"local_file":          fullPath,
-			"clear_on_media_end":  false,
-			"close_when_inactive": true,
+			"playlist": playlist,
+			"loop":     false,
+			"shuffle":  false,
 		})
 
 		if err != nil {
@@ -297,10 +301,14 @@ func (h *EpisodeSourceHandler) autoAssignForSource(episodeID uint, sourceName st
 
 		fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*media.FilePath))
 
+		playlist := make([]map[string]interface{}, 0)
+		playlist = append(playlist, map[string]interface{}{
+			"value": fullPath,
+		})
 		err = h.OBSClient.SetInputSettings(sourceName, map[string]interface{}{
-			"local_file":          fullPath,
-			"clear_on_media_end":  false,
-			"close_when_inactive": true,
+			"playlist": playlist,
+			"loop":     false,
+			"shuffle":  false,
 		})
 
 		if err != nil {

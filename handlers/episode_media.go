@@ -438,6 +438,10 @@ func (h *EpisodeMediaHandler) GetCurrentMediaForScene(w http.ResponseWriter, r *
 		// Zbuduj pełną ścieżkę: C:/Users/.../media/season_1/file.mp4
 		fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*currentMedia.FilePath))
 
+		playlist := make([]map[string]interface{}, 0)
+		playlist = append(playlist, map[string]interface{}{
+			"value": fullPath,
+		})
 		// Określ nazwę źródła w OBS na podstawie nazwy sceny
 		var inputName string
 		if sceneName == "MEDIA" {
@@ -449,14 +453,14 @@ func (h *EpisodeMediaHandler) GetCurrentMediaForScene(w http.ResponseWriter, r *
 		if inputName != "" {
 			// Ustaw ustawienia źródła w OBS
 			err = h.OBSClient.SetInputSettings(inputName, map[string]interface{}{
-				"local_file":          fullPath,
-				"clear_on_media_end":  false,
-				"close_when_inactive": true,
+				"playlist": playlist,
+				"loop":     false,
+				"shuffle":  false,
 			})
 
 			if err != nil {
-				// Loguj błąd, ale nie przerywaj - zwróć dane mimo błędu OBS
-				fmt.Printf("Błąd ustawiania pliku w OBS dla źródła %s: %v\n", inputName, err)
+				http.Error(w, fmt.Sprintf("Failed to set OBS playlist: %v", err), http.StatusInternalServerError)
+				return
 			}
 		}
 	}

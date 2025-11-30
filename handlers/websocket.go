@@ -61,7 +61,7 @@ func NewSocketHandler(db *gorm.DB, obsClient *obsws.Client) (*SocketHandler, err
 	server.OnEvent("/", "mute_all_microphones", handler.handleMuteAllMicrophones)
 	server.OnEvent("/", "restore_microphones", handler.handleRestoreMicrophones)
 	server.OnEvent("/", "set_input_volume", handler.handleSetInputVolume)
-	// server.OnEvent("/", "get_input_volume", handler.handleGetInputVolume)
+	server.OnEvent("/", "get_input_volume", handler.handleGetInputVolume)
 
 	go server.Serve()
 
@@ -515,19 +515,19 @@ func (h *SocketHandler) handleSetInputVolume(s socketio.Conn, msg string) string
 }
 
 // handleGetInputVolume - pobierz aktualną głośność źródła audio
-// func (h *SocketHandler) handleGetInputVolume(s socketio.Conn, inputName string) string {
-// 	if h.OBSClient == nil {
-// 		return h.errorResponse("OBS not connected")
-// 	}
+func (h *SocketHandler) handleGetInputVolume(s socketio.Conn, inputName string) string {
+	if h.OBSClient == nil {
+		return h.errorResponse("OBS not connected")
+	}
 
-// 	volumeDb, err := h.OBSClient.GetInputVolume(inputName)
-// 	if err != nil {
-// 		log.Printf("Error getting volume for %s: %v", inputName, err)
-// 		return h.errorResponse(err.Error())
-// 	}
+	volumeDb, err := h.OBSClient.GetInputVolume(inputName)
+	if err != nil {
+		log.Printf("Error getting volume for %s: %v", inputName, err)
+		return h.errorResponse(err.Error())
+	}
 
-// 	return h.successResponse(map[string]interface{}{
-// 		"source_name": inputName,
-// 		"volume_db":   volumeDb,
-// 	})
-//}
+	return h.successResponse(map[string]interface{}{
+		"source_name": inputName,
+		"volume_db":   volumeDb,
+	})
+}
