@@ -76,7 +76,6 @@ func (h *EpisodeSourceHandler) AssignMediaToSource(w http.ResponseWriter, r *htt
 
 		// Zbuduj pełną ścieżkę
 		fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*media.FilePath))
-
 		playlist := make([]map[string]interface{}, 0)
 		playlist = append(playlist, map[string]interface{}{
 			"value": fullPath,
@@ -300,11 +299,11 @@ func (h *EpisodeSourceHandler) autoAssignForSource(episodeID uint, sourceName st
 		}
 
 		fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*media.FilePath))
-
 		playlist := make([]map[string]interface{}, 0)
 		playlist = append(playlist, map[string]interface{}{
 			"value": fullPath,
 		})
+		// Ustaw plik w źródle Media Source
 		err = h.OBSClient.SetInputSettings(sourceName, map[string]interface{}{
 			"playlist": playlist,
 			"loop":     false,
@@ -836,33 +835,35 @@ func (h *EpisodeSourceHandler) GetCameraTypesForModal(w http.ResponseWriter, r *
 
 	sourceName := vars["source_name"]
 
-	// Pobierz aktualne przypisanie
+	// Pobierz aktualne przypisanie dla tej kamery
 	var currentCameraTypeID *uint
 	existing, err := models.GetEpisodeSourceAssignment(h.DB, uint(episodeID), sourceName)
 	if err == nil && existing != nil {
 		currentCameraTypeID = existing.CameraTypeID
 	}
 
-	// Pobierz wszystkie typy kamer
+	// KROK 1: Pobierz WSZYSTKIE typy kamer z tabeli camera_types
 	var cameraTypes []models.CameraType
 	if err := h.DB.Order("\"order\" ASC").Find(&cameraTypes).Error; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Pobierz wszystkie przypisania w tym odcinku
+	// KROK 2: Sprawdź które typy są już przypisane do INNYCH kamer w tym odcinku
+	// (tylko po to, żeby zapobiec duplikatom)
 	var episodeSources []models.EpisodeSource
-	h.DB.Where("episode_id = ? AND camera_type_id IS NOT NULL", episodeID).Find(&episodeSources)
+	h.DB.Where("episode_id = ? AND camera_type_id IS NOT NULL AND source_name != ?",
+		episodeID, sourceName).Find(&episodeSources)
 
-	// Mapa: camera_type_id → source_name (które kamery mają które typy)
+	// Mapa: camera_type_id → source_name (która kamera ma który typ)
 	assignedTypes := make(map[uint]string)
 	for _, es := range episodeSources {
-		if es.CameraTypeID != nil && es.SourceName != sourceName {
+		if es.CameraTypeID != nil {
 			assignedTypes[*es.CameraTypeID] = es.SourceName
 		}
 	}
 
-	// Przygotuj wynik
+	// KROK 3: Przygotuj wynik - WSZYSTKIE typy z info o zajętości
 	result := make([]map[string]interface{}, 0)
 	for _, ct := range cameraTypes {
 		assignedTo := assignedTypes[ct.ID]
@@ -873,9 +874,9 @@ func (h *EpisodeSourceHandler) GetCameraTypesForModal(w http.ResponseWriter, r *
 			"name":        ct.Name,
 			"order":       ct.Order,
 			"is_system":   ct.IsSystem,
-			"is_assigned": assignedTo != "",
-			"assigned_to": assignedTo,
-			"is_current":  isCurrent,
+			"is_assigned": assignedTo != "", // true jeśli zajęty przez INNĄ kamerę
+			"assigned_to": assignedTo,       // nazwa kamery która go używa
+			"is_current":  isCurrent,        // true jeśli to aktualny typ TEJ kamery
 		})
 	}
 
@@ -889,7 +890,7 @@ func (h *EpisodeSourceHandler) GetCameraTypesForModal(w http.ResponseWriter, r *
 // GetMicrophonePeopleList zwraca listę Staff + Guests dla modalu mikrofonów
 func (h *EpisodeSourceHandler) GetMicrophonePeopleList(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	episodeID, err := strconv.Atoi(vars["id"])
 	if err != nil {
 		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
 		return
@@ -1002,7 +1003,7 @@ func (h *EpisodeSourceHandler) GetMicrophonePeopleList(w http.ResponseWriter, r 
 // AssignMicrophonePerson przypisuje osobę (staff/guest) do mikrofonu
 func (h *EpisodeSourceHandler) AssignMicrophonePerson(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	episodeID, err := strconv.Atoi(vars["id"])
 	if err != nil {
 		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
 		return
@@ -1014,8 +1015,6 @@ func (h *EpisodeSourceHandler) AssignMicrophonePerson(w http.ResponseWriter, r *
 		PersonID   *uint  `json:"person_id"`   // null = usuń przypisanie
 		PersonType string `json:"person_type"` // "staff" lub "guest"
 	}
-
-	fmt.Print("<episode_source.go> data: ", data)
 
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -1090,4 +1089,44 @@ func (h *EpisodeSourceHandler) AssignMicrophonePerson(w http.ResponseWriter, r *
 		"success": true,
 		"message": fmt.Sprintf("Assigned %s to %s", personName, sourceName),
 	})
+}
+
+// GetCameraAssignments - GET /api/episodes/{episode_id}/camera-assignments
+// Pobiera wszystkie przypisania kamer dla odcinka (bez auto-assign, bez broadcast)
+func (h *EpisodeSourceHandler) GetCameraAssignments(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
+	if err != nil {
+		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
+		return
+	}
+
+	// Pobierz wszystkie episode_sources dla tego odcinka gdzie camera_type_id != NULL
+	var episodeSources []models.EpisodeSource
+	err = h.DB.Where("episode_id = ? AND camera_type_id IS NOT NULL", uint(episodeID)).
+		Preload("CameraType").
+		Find(&episodeSources).Error
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Przygotuj mapę: source_name → camera_type_info
+	result := make(map[string]interface{})
+
+	for _, es := range episodeSources {
+		if es.CameraType != nil {
+			result[es.SourceName] = map[string]interface{}{
+				"camera_type_id":   es.CameraType.ID,
+				"camera_type_name": es.CameraType.Name,
+				"assigned_by":      es.AssignedBy,
+				"is_disabled":      false,
+			}
+		}
+	}
+
+	// Zwróć przypisania (bez żadnego broadcast)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }

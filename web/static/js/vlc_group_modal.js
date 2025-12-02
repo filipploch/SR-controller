@@ -1,8 +1,5 @@
 // vlc_group_modal.js - Modal wyboru grupy dla VLC Video Source (Media2/Reportaze2)
 
-let currentVLCModalSourceName = null;
-let vlcModalData = null;
-
 // Otwórz modal wyboru grupy
 async function openVLCGroupModal(sourceName, sceneName) {
     currentVLCModalSourceName = sourceName;
@@ -31,8 +28,8 @@ async function openVLCGroupModal(sourceName, sceneName) {
 
 // Renderuj zawartość modalu
 function renderVLCGroupModal(data, sourceName, sceneName) {
-    const modalTitle = document.getElementById('vlc-group-modal-title');
-    modalTitle.textContent = `Wybierz grupę dla ${sourceName}`;
+    const modalVLCGroupTitle = document.getElementById('vlc-group-modal-title');
+    modalVLCGroupTitle.textContent = `Wybierz grupę dla ${sourceName}`;
 
     const modalBody = document.getElementById('vlc-group-modal-body');
     modalBody.innerHTML = '';

@@ -108,7 +108,7 @@
     <div class="modal" id="typeModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="typeModalTitle">Nowy Typ Gościa</h2>
+                <h2 id="guestTypeModalTitle">Nowy Typ Gościa</h2>
                 <button class="modal-close" onclick="closeTypeModal()">&times;</button>
             </div>
             <form id="typeForm">
@@ -191,7 +191,7 @@
         }
 
         function openTypeModal() {
-            document.getElementById('typeModalTitle').textContent = 'Nowy Typ Gościa';
+            document.getElementById('guestTypeModalTitle').textContent = 'Nowy Typ Gościa';
             document.getElementById('typeForm').reset();
             document.getElementById('typeId').value = '';
             document.getElementById('typeModal').classList.add('active');
@@ -201,7 +201,7 @@
             const type = types.find(t => t.id === id);
             if (!type) return;
 
-            document.getElementById('typeModalTitle').textContent = 'Edycja Typu';
+            document.getElementById('guestTypeModalTitle').textContent = 'Edycja Typu';
             document.getElementById('typeId').value = type.id;
             document.getElementById('typeName').value = type.name;
             document.getElementById('typeModal').classList.add('active');

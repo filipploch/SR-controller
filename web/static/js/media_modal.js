@@ -1,9 +1,5 @@
 // ===== MODAL WYBORU MEDIÓW =====
 
-let currentEpisodeId = null;
-let currentModalSourceName = null;
-let modalData = null;
-
 // Pobierz aktualny odcinek przy ładowaniu
 async function loadCurrentEpisode() {
     try {
@@ -44,9 +40,9 @@ async function openMediaModal(sourceName, sceneName) {
 // Renderuj modal
 function renderMediaModal(data, sourceName, sceneName) {
     const modalBody = document.getElementById('media-modal-body');
-    const modalTitle = document.getElementById('media-modal-title');
+    const modalMediaTitle = document.getElementById('media-modal-title');
 
-    modalTitle.textContent = `Wybierz media dla ${sourceName} (${sceneName})`;
+    modalMediaTitle.textContent = `Wybierz media dla ${sourceName} (${sceneName})`;
     modalBody.innerHTML = '';
 
     if (!data.groups || data.groups.length === 0) {
@@ -343,32 +339,45 @@ async function autoAssignVLCSources() {
 }
 
 // Automatyczne przypisanie typów kamer (Kamera1-4)
-async function autoAssignCameraTypes() {
-    if (!currentEpisodeId) {
-        console.log('Brak aktualnego odcinka - pomijam automatyczne przypisanie kamer');
-        return;
-    }
+// async function autoAssignCameraTypes() {
+//     if (!currentEpisodeId) {
+//         console.log('Brak aktualnego odcinka - pomijam automatyczne przypisanie kamer');
+//         return;
+//     }
 
-    try {
-        const response = await fetch(`/api/episodes/${currentEpisodeId}/auto-assign-camera-types`, {
-            method: 'POST'
-        });
-        const result = await response.json();
+//     try {
+//         const response = await fetch(`/api/episodes/${currentEpisodeId}/auto-assign-camera-types`, {
+//             method: 'POST'
+//         });
+//         const result = await response.json();
 
-        console.log('Wynik automatycznego przypisania kamer:', result);
+//         console.log('Wynik automatycznego przypisania kamer:', result);
 
-        // Zaktualizuj przyciski dla przypisanych kamer
-        ['Kamera1', 'Kamera2', 'Kamera3', 'Kamera4'].forEach(sourceName => {
-            if (result[sourceName] && result[sourceName].assigned) {
-                updateCameraButtonState(
-                    sourceName,
-                    result[sourceName].camera_type_name,
-                    false // nie wyłączona
-                );
-            }
-        });
-    } catch (error) {
-        console.error('Błąd automatycznego przypisania kamer:', error);
+//         // Zaktualizuj przyciski dla przypisanych kamer
+//         ['Kamera1', 'Kamera2', 'Kamera3', 'Kamera4'].forEach(sourceName => {
+//             if (result[sourceName] && result[sourceName].assigned) {
+//                 updateCameraButtonState(
+//                     sourceName,
+//                     result[sourceName].camera_type_name,
+//                     false // nie wyłączona
+//                 );
+//             }
+//         });
+//     } catch (error) {
+//         console.error('Błąd automatycznego przypisania kamer:', error);
+//     }
+// }
+
+async function loadCameraAssignments() {
+    const response = await fetch(`/api/episodes/${currentEpisodeId}/camera-assignments`);  // ← GET, read-only
+    const assignments = await response.json();
+
+    for (const [sourceName, assignment] of Object.entries(assignments)) {
+        updateCameraButtonState(
+            sourceName,
+            assignment.camera_type_name,
+            assignment.is_disabled || false
+        );
     }
 }
 
@@ -411,7 +420,8 @@ socket.on('connect', () => {
         // (renderSources wywoła loadAllSourceAssignments() po wyrenderowaniu przycisków)
         autoAssignMediaSources().then(() => {
             autoAssignVLCSources().then(() => {
-                autoAssignCameraTypes();
+                // autoAssignCameraTypes();
+                loadCameraAssignments()
             });
         });
     });

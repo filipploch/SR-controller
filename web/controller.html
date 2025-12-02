@@ -16,11 +16,17 @@
         <div class="header">
             <h1>Kontroler OBS</h1>
             <div class="status">
-                <a href="/settings" style="text-decoration: none; color: inherit; margin-right: 15px;">
-                    <div class="status-item">
-                        <span>⚙️ Ustawienia</span>
-                    </div>
-                </a>
+                <div id="openSettings" class="status-item">
+                    <span>⚙️ Ustawienia</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-dot" id="seasonStatus"></div>
+                    <span class="status-text" id="seasonText">Sezon</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-dot" id="episodeStatus"></div>
+                    <span class="status-text" id="episodeText">Odcinek</span>
+                </div>
                 <div class="status-item">
                     <div class="status-dot" id="socketStatus"></div>
                     <span>Socket.IO</span>
@@ -31,8 +37,10 @@
                 </div>
             </div>
         </div>
+        
+        <div id="warningContainer"></div>
 
-        <div class="scenes-grid">
+        <div id="controllerWindow" class="content-window controller-grid">
             <!-- Panel sterowania OBS -->
             <div class="obs-control-panel">
                 <h3>Sterowanie OBS</h3>
@@ -58,17 +66,17 @@
             <!-- Panel z zakładkami MEDIA/REPORTAŻE -->
             <div class="scene-panel-tabbed">
                 <div class="tab-buttons">
-                    <button class="tab-btn active" data-tab="media" onclick="switchTab('media-reportaze', 'media')">Media</button>
-                    <button class="tab-btn" data-tab="reportaze" onclick="switchTab('media-reportaze', 'reportaze')">Reportaże</button>
+                    <button class="tab-btn active" data-tab="media" onclick="switchControllerTab('media-reportaze', 'media')">Media</button>
+                    <button class="tab-btn" data-tab="reportaze" onclick="switchControllerTab('media-reportaze', 'reportaze')">Reportaże</button>
                 </div>
-                
+
                 <div class="tab-content active" id="tab-media" data-scene="MEDIA">
                     <div class="sources-list" id="sources-media">
                         <div class="loading">Ładowanie...</div>
                     </div>
                     <button class="save-order-btn" id="save-media" onclick="saveSourceOrder('MEDIA')">💾 Zapisz</button>
                 </div>
-                
+
                 <div class="tab-content" id="tab-reportaze" data-scene="REPORTAZE">
                     <div class="sources-list" id="sources-reportaze">
                         <div class="loading">Ładowanie...</div>
@@ -80,17 +88,17 @@
             <!-- Panel z zakładkami MIKROFONY/MUZYKA -->
             <div class="scene-panel-tabbed">
                 <div class="tab-buttons">
-                    <button class="tab-btn active" data-tab="mikrofony" onclick="switchTab('mikrofony-muzyka', 'mikrofony')">Mikrofony</button>
-                    <button class="tab-btn" data-tab="muzyka" onclick="switchTab('mikrofony-muzyka', 'muzyka')">Muzyka</button>
+                    <button class="tab-btn active" data-tab="mikrofony" onclick="switchControllerTab('mikrofony-muzyka', 'mikrofony')">Mikrofony</button>
+                    <button class="tab-btn" data-tab="muzyka" onclick="switchControllerTab('mikrofony-muzyka', 'muzyka')">Muzyka</button>
                 </div>
-                
+
                 <div class="tab-content active" id="tab-mikrofony" data-scene="MIKROFONY">
                     <div class="sources-list" id="sources-mikrofony">
                         <div class="loading">Ładowanie...</div>
                     </div>
                     <button class="save-order-btn" id="save-mikrofony" onclick="saveSourceOrder('MIKROFONY')">💾 Zapisz</button>
                 </div>
-                
+
                 <div class="tab-content" id="tab-muzyka" data-scene="MUZYKA">
                     <div class="sources-list" id="sources-muzyka">
                         <div class="loading">Ładowanie...</div>
@@ -99,7 +107,159 @@
                 </div>
             </div>
         </div>
+        <div id="settingsWindow" class="content-window hidden">
+            <div class="navigation-card">
+                <h2>Konfiguracja</h2>
+                <div class="nav-links">
+                    
+                    <button onclick="showContentWindow('seasonsWindow');" class="nav-link">📅 Sezony</button>
+                    <button onclick="showContentWindow('episodesWindow');" class="nav-link">🎬 Odcinki</button>
+                    <button onclick="showContentWindow('staffWindow');" class="nav-link">👥 Ekipa</button>
+                    <button onclick="showContentWindow('guestsWindow');" class="nav-link">🎤 Goście</button>
+                    <button onclick="showContentWindow('camerasWindow');" class="nav-link">📹 Kamery</button>
+                </div>
+            </div>
+
+            <div class="navigation-card">
+                <h2>Panel Kontrolny</h2>
+                <div class="nav-links">
+                    <button onclick="showContentWindow('controllerWindow');" class="nav-link primary" id="controllerLink">🎛️ Kontroler</button>
+                </div>
+            </div>
+        </div>
+        <div id="seasonsWindow" class="content-window hidden">
+            <div class="toolbar">
+                <div></div>
+                <button class="btn btn-primary btn-small" onclick="openCreateModal()">+ Nowy Sezon</button>
+            </div>
+
+            <div class="scrollable">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">Numer</th>
+                            <th>Opis</th>
+                            <th style="width: 80px;">Status</th>
+                            <th style="width: 120px;">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody id="seasonsTableBody">
+                        <tr>
+                            <td colspan="4" class="loading">Ładowanie...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>       
+        <div id="episodesWindow" class="content-window hidden">
+            <div class="toolbar">
+                <div class="filter-group">
+                    <label style="font-size: 10px; color: #aaa;">Sezon:</label>
+                    <select class="form-control" id="seasonFilter" onchange="loadEpisodes()">
+                        <option value="">Wszystkie</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary btn-small" onclick="openCreateModal()">+ Nowy Odcinek</button>
+            </div>
+
+            <div class="scrollable">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">Nr</th>
+                            <th style="width: 60px;">Sezon</th>
+                            <th>Tytuł</th>
+                            <th style="width: 100px;">Data</th>
+                            <th style="width: 80px;">Status</th>
+                            <th style="width: 140px;">Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody id="episodesTableBody">
+                        <tr>
+                            <td colspan="6" class="loading">Ładowanie...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div id="guestsWindow" class="content-window hidden">
+            <!-- Panel typów -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Typy Gości</h2>
+                    <button class="btn btn-primary btn-small" onclick="openTypeModal()">+ Typ</button>
+                </div>
+                <div class="scrollable" id="guestTypesContainer">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+            </div>
+
+            <!-- Panel gości -->
+            <div class="panel" style="flex: 2;">
+                <div class="panel-header">
+                    <h2>Goście</h2>
+                    <button class="btn btn-primary btn-small" onclick="openGuestModal()">+ Gość</button>
+                </div>
+                <div class="scrollable" id="guestsContainer">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+            </div>
+        </div>
+        <div id="staffWindow" class="content-window hidden">
+            <!-- Panel typów -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Typy Ekipy</h2>
+                    <button class="btn btn-primary btn-small" onclick="openTypeModal()">+ Typ</button>
+                </div>
+                <div class="scrollable" id="staffTypesContainer">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+            </div>
+
+            <!-- Panel pracowników -->
+            <div class="panel" style="flex: 2;">
+                <div class="panel-header">
+                    <h2>Członkowie Ekipy</h2>
+                    <button class="btn btn-primary btn-small" onclick="openStaffModal()">+ Osoba</button>
+                </div>
+                <div class="scrollable" id="staffContainer">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+            </div>
+        </div>
+        <div id="camerasWindow" class="content-window hidden">
+            <!-- Panel typów kamer -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Typy Kamer</h2>
+                    <button class="btn btn-primary btn-small" onclick="openCameraTypeModal()">+ Dodaj Typ</button>
+                </div>
+                <div class="scrollable" id="cameraTypesContainer">
+                    <div class="loading">Ładowanie...</div>
+                </div>
+            </div>
+
+            <!-- Panel informacyjny -->
+            <div class="info-panel">
+                <div class="info-icon">📹</div>
+                <div class="info-title">Typy Kamer</div>
+                <div class="info-text">
+                    Zarządzaj typami kamer używanych w systemie kontrolera OBS.
+                </div>
+                <ul class="info-list">
+                    <li><strong>Typy systemowe</strong> - predefiniowane, nie można edytować ani usunąć</li>
+                    <li><strong>Typy użytkownika</strong> - można dodawać, edytować i usuwać</li>
+                    <li><strong>Kolejność</strong> - określa domyślne przypisanie do kamer (Kamera1-4)</li>
+                    <li><strong>Auto-przypisanie</strong> - Kamera1→Centralna, Kamera2→Prowadzący, itd.</li>
+                </ul>
+                <div class="info-text" style="margin-top: 15px; font-size: 9px; color: #666;">
+                    Typy systemowe: Centralna, Prowadzący, Goście, Dodatkowa
+                </div>
+            </div>
+        </div>
     </div>
+    
 
     <!-- Modal wyboru mediów -->
     <div id="media-modal-overlay" class="media-modal-overlay">
@@ -152,9 +312,464 @@
             </div>
         </div>
     </div>
+    
+    <!-- Modal tworzenia/edycji sezonu -->
+    <div class="modal" id="seasonModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalSeasonTitle">Nowy Sezon</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="seasonForm">
+                <input type="hidden" id="seasonId">
+                <div class="form-group">
+                    <label for="seasonNumber">Numer Sezonu *</label>
+                    <input type="number" class="form-control" id="seasonNumber" required min="1">
+                </div>
+                <div class="form-group">
+                    <label for="seasonDescription">Opis</label>
+                    <textarea class="form-control" id="seasonDescription" placeholder="Opcjonalny opis sezonu..."></textarea>
+                </div>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="seasonIsCurrent">
+                        <label for="seasonIsCurrent">Ustaw jako aktualny sezon</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal tworzenia/edycji ocinka -->
+    <div class="modal" id="episodeModal">
+        <div class="modal-content modal-content-large">
+            <div class="modal-header">
+                <h2 id="modalEpisodeTitle">Nowy Odcinek</h2>
+                <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+
+            <!-- Zakładki -->
+            <div class="modal-tabs">
+                <button class="modal-tab active" onclick="switchEpisodeTab('data', this)">Dane Odcinka</button>
+                <button class="modal-tab" onclick="switchEpisodeTab('staff', this)">Ekipa</button>
+                <button class="modal-tab" onclick="switchEpisodeTab('guests', this)">Goście</button>
+                <button class="modal-tab" onclick="switchEpisodeTab('media', this)">Media</button>
+            </div>
+
+            <!-- Zakładka: Dane Odcinka -->
+            <div id="tabData" class="tab-content active">
+                <form id="episodeForm">
+                    <input type="hidden" id="episodeId">
+                    <div class="form-group">
+                        <label for="episodeSeason">Sezon *</label>
+                        <select class="form-control" id="episodeSeason" required>
+                            <option value="">Wybierz sezon...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="episodeNumber">Numer Odcinka (ciągły) *</label>
+                        <input type="number" class="form-control" id="episodeNumber" required min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="seasonEpisode">Numer w Sezonie *</label>
+                        <input type="number" class="form-control" id="seasonEpisode" required min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="episodeTitle">Tytuł *</label>
+                        <input type="text" class="form-control" id="episodeTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="episodeDate">Data Odcinka (YYYY-MM-DD)</label>
+                        <input type="text" class="form-control" id="episodeDate" placeholder="YYYY-MM-DD" pattern="\d{4}-\d{2}-\d{2}" title="Format: YYYY-MM-DD (np. 2024-12-31)">
+                    </div>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="episodeIsCurrent">
+                            <label for="episodeIsCurrent">Ustaw jako aktualny odcinek</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Zakładka: Ekipa -->
+            <div id="tabStaff" class="tab-content">
+                <div class="scrollable-tab">
+                    <div style="margin-bottom: 15px; display: flex; gap: 8px;">
+                        <button class="btn btn-primary btn-small" onclick="openAddStaffModal()">+ Nowy Członek Ekipy</button>
+                        <button class="btn btn-secondary btn-small" onclick="openAddStaffTypeModal()">+ Nowy Typ Ekipy</button>
+                    </div>
+                    
+                    <div class="assignment-section">
+                        <div class="assignment-list">
+                            <h4>Dostępni</h4>
+                            <div id="availableStaffList"></div>
+                        </div>
+                        <div class="assignment-list">
+                            <h4>Przypisani do odcinka</h4>
+                            <div id="assignedStaffList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zakładka: Goście -->
+            <div id="tabGuests" class="tab-content">
+                <div class="scrollable-tab">
+                    <div style="margin-bottom: 15px; display: flex; gap: 8px;">
+                        <button class="btn btn-primary btn-small" onclick="openAddGuestModal()">+ Nowy Gość</button>
+                        <button class="btn btn-secondary btn-small" onclick="openAddGuestTypeModal()">+ Nowy Typ Gościa</button>
+                    </div>
+                    
+                    <div class="assignment-section">
+                        <div class="assignment-list">
+                            <h4>Dostępni</h4>
+                            <div id="availableGuestsList"></div>
+                        </div>
+                        <div class="assignment-list">
+                            <h4>Przypisani do odcinka</h4>
+                            <div id="assignedGuestsList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zakładka: Media -->
+            <div id="tabMedia" class="tab-content">
+                <!-- Pod-zakładki Media -->
+                <div class="sub-tabs">
+                    <button class="sub-tab active" onclick="switchMediaSubTab('all', this)">Wszystkie</button>
+                    <button class="sub-tab" onclick="switchMediaSubTab('assigned', this)">Przypisane</button>
+                    <button class="sub-tab" onclick="switchMediaSubTab('groups', this)">Grupy</button>
+                </div>
+
+                <!-- Pod-zakładka: Wszystkie -->
+                <div id="mediaSubTabAll" class="sub-tab-content active">
+                    <div class="scrollable-tab">
+                        <div style="margin-bottom: 15px;">
+                            <h4 style="margin-bottom: 10px;">Dostępne pliki w folderze sezonu:</h4>
+                            <div class="media-files-grid" id="mediaFilesGrid">
+                                <div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #666;">
+                                    Ładowanie...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pod-zakładka: Przypisane -->
+                <div id="mediaSubTabAssigned" class="sub-tab-content">
+                    <div class="scrollable-tab">
+                        <div style="margin-top: 20px;">
+                            <h4 style="margin-bottom: 15px;">Wszystkie media przypisane do odcinka:</h4>
+                            <div class="assigned-media-list" id="assignedMediaList">
+                                <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
+                                    Brak przypisanych mediów
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pod-zakładka: Grupy -->
+                <div id="mediaSubTabGroups" class="sub-tab-content">
+                    <div class="scrollable-tab">
+                        <div style="margin-top: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4>Grupy Mediów:</h4>
+                                <button class="btn btn-primary btn-small" onclick="openAddMediaGroupModal()">+ Nowa Grupa</button>
+                            </div>
+                            
+                            <!-- Grupy systemowe -->
+                            <div style="margin-bottom: 20px;">
+                                <h5 style="font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 10px;">Grupy systemowe (nie można usunąć)</h5>
+                                <div id="systemGroupsList"></div>
+                            </div>
+                            
+                            <!-- Grupy użytkownika -->
+                            <div>
+                                <h5 style="font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 10px;">Grupy użytkownika</h5>
+                                <div id="userGroupsList">
+                                    <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
+                                        Brak grup użytkownika
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal()">Zamknij</button>
+                <button type="button" class="btn btn-primary" onclick="saveEpisode()">Zapisz Odcinek</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal dodawania Staff -->
+    <div class="modal" id="addStaffModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nowy Członek Ekipy</h2>
+                <button type="button" class="modal-close" onclick="closeAddStaffModal()">&times;</button>
+            </div>
+            <form id="addStaffForm">
+                <div class="form-group">
+                    <label for="staffFirstName">Imię *</label>
+                    <input type="text" class="form-control" id="staffFirstName" required>
+                </div>
+                <div class="form-group">
+                    <label for="staffLastName">Nazwisko *</label>
+                    <input type="text" class="form-control" id="staffLastName" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeAddStaffModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Dodaj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal dodawania StaffType -->
+    <div class="modal" id="addStaffTypeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nowy Typ Członka Ekipy</h2>
+                <button type="button" class="modal-close" onclick="closeAddStaffTypeModal()">&times;</button>
+            </div>
+            <form id="addStaffTypeForm">
+                <div class="form-group">
+                    <label for="staffTypeName">Nazwa Typu *</label>
+                    <input type="text" class="form-control" id="staffTypeName" required placeholder="np. Redaktor prowadzący, Operator kamery">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeAddStaffTypeModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Dodaj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal dodawania Guest -->
+    <div class="modal" id="addGuestModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nowy Gość</h2>
+                <button type="button" class="modal-close" onclick="closeAddGuestModal()">&times;</button>
+            </div>
+            <form id="addGuestForm">
+                <div class="form-group">
+                    <label for="guestType">Typ</label>
+                    <select class="form-control" id="guestType">
+                        <option value="">Wybierz typ...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="guestFirstName">Imię *</label>
+                    <input type="text" class="form-control" id="guestFirstName" required>
+                </div>
+                <div class="form-group">
+                    <label for="guestLastName">Nazwisko *</label>
+                    <input type="text" class="form-control" id="guestLastName" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeAddGuestModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Dodaj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal dodawania GuestType -->
+    <div class="modal" id="addGuestTypeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nowy Typ Gościa</h2>
+                <button type="button" class="modal-close" onclick="closeAddGuestTypeModal()">&times;</button>
+            </div>
+            <form id="addGuestTypeForm">
+                <div class="form-group">
+                    <label for="guestTypeName">Nazwa Typu *</label>
+                    <input type="text" class="form-control" id="guestTypeName" required placeholder="np. Ekspert, Artysta, Polityk">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeAddGuestTypeModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Dodaj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal przypisywania Media -->
+    <div class="modal" id="assignMediaModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Przypisz Media</h2>
+                <button type="button" class="modal-close" onclick="closeAssignMediaModal()">&times;</button>
+            </div>
+            <form id="assignMediaForm">
+                <input type="hidden" id="mediaFilePath">
+                <input type="hidden" id="mediaFileDuration">
+                <div class="form-group">
+                    <label>Plik</label>
+                    <div style="padding: 8px; background: #1a1a1a; border-radius: 4px; font-size: 12px;" id="mediaFileName"></div>
+                </div>
+                <div class="form-group">
+                    <label for="mediaTitle">Tytuł *</label>
+                    <input type="text" class="form-control" id="mediaTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="mediaDescription">Opis</label>
+                    <textarea class="form-control" id="mediaDescription" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="mediaStaff">Autor</label>
+                    <select class="form-control" id="mediaStaff">
+                        <option value="">Brak</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="mediaGroupsSelect">Grupy * (można wybrać wiele z Ctrl/Cmd)</label>
+                    <select class="form-control" id="mediaGroupsSelect" multiple style="height: 150px;" required>
+                    </select>
+                    <div style="font-size: 10px; color: #888; margin-top: 5px;">
+                        Przytrzymaj Ctrl (Windows/Linux) lub Cmd (Mac) aby wybrać wiele grup
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeAssignMediaModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Przypisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal edycji typów Staff -->
+    <div class="modal" id="editStaffTypesModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edytuj Typy Członka Ekipy</h2>
+                <button type="button" class="modal-close" onclick="closeEditStaffTypesModal()">&times;</button>
+            </div>
+            <form id="editStaffTypesForm">
+                <input type="hidden" id="editStaffAssignmentId">
+                <div class="form-group">
+                    <label>Członek ekipy</label>
+                    <div style="padding: 8px; background: #1a1a1a; border-radius: 4px; font-size: 12px;" id="editStaffName"></div>
+                </div>
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label for="editStaffTypesSelect">Typy (można wybrać wiele z Ctrl/Cmd)</label>
+                        <button type="button" class="btn btn-secondary btn-small" onclick="openAddStaffTypeModalFromEdit()">+ Nowy Typ</button>
+                    </div>
+                    <select class="form-control" id="editStaffTypesSelect" multiple style="height: 150px;">
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeEditStaffTypesModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal edycji Gościa w odcinku -->
+    <div class="modal" id="editGuestModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edytuj Gościa</h2>
+                <button type="button" class="modal-close" onclick="closeEditGuestModal()">&times;</button>
+            </div>
+            <form id="editGuestForm">
+                <input type="hidden" id="editGuestAssignmentId">
+                <div class="form-group">
+                    <label>Gość</label>
+                    <div style="padding: 8px; background: #1a1a1a; border-radius: 4px; font-size: 12px;" id="editGuestName"></div>
+                </div>
+                <div class="form-group">
+                    <label for="editGuestTopic">Temat</label>
+                    <input type="text" class="form-control" id="editGuestTopic">
+                </div>
+                <div class="form-group">
+                    <label for="editGuestOrder">Kolejność</label>
+                    <input type="number" class="form-control" id="editGuestOrder" value="1" min="1">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeEditGuestModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal dodawania grupy mediów -->
+    <div class="modal" id="addMediaGroupModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nowa Grupa Mediów</h2>
+                <button type="button" class="modal-close" onclick="closeAddMediaGroupModal()">&times;</button>
+            </div>
+            <form id="addMediaGroupForm">
+                <div class="form-group">
+                    <label for="groupName">Nazwa grupy *</label>
+                    <input type="text" class="form-control" id="groupName" required>
+                </div>
+                <div class="form-group">
+                    <label for="groupDescription">Opis</label>
+                    <textarea class="form-control" id="groupDescription" rows="3"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeAddMediaGroupModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Utwórz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal zarządzania grupą -->
+    <div class="modal" id="manageMediaGroupModal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2 id="manageGroupTitle">Zarządzanie Grupą</h2>
+                <button type="button" class="modal-close" onclick="closeManageMediaGroupModal()">&times;</button>
+            </div>
+            <input type="hidden" id="manageGroupId">
+            
+            <div class="form-group">
+                <label for="manageGroupName">Nazwa grupy</label>
+                <input type="text" class="form-control" id="manageGroupName">
+            </div>
+            <div class="form-group">
+                <label for="manageGroupDescription">Opis</label>
+                <textarea class="form-control" id="manageGroupDescription" rows="2"></textarea>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <h4 style="margin-bottom: 10px;">Media w grupie:</h4>
+                <div id="groupMediaList" style="max-height: 300px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; padding: 10px;">
+                    <div style="text-align: center; padding: 20px; color: #666; font-size: 11px;">
+                        Brak mediów w grupie
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" onclick="deleteMediaGroup()" id="deleteGroupBtn">Usuń Grupę</button>
+                <button type="button" class="btn" onclick="closeManageMediaGroupModal()">Zamknij</button>
+                <button type="button" class="btn btn-primary" onclick="updateMediaGroup()">Zapisz Zmiany</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/static/js/socket.io.min.js"></script>
     <script src="/static/js/controller.js"></script>
+    <script src="/static/js/settings.js"></script>
+    <script src="/static/js/seasons.js"></script>
+    <script src="/static/js/episodes-manager.js"></script>
     <script src="/static/js/media_modal.js"></script>
     <script src="/static/js/vlc_group_modal.js"></script>
     <script src="/static/js/camera_type_modal.js"></script>

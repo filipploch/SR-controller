@@ -246,8 +246,11 @@ func main() {
 	api.HandleFunc("/episodes/{episode_id}/auto-assign-media-sources", episodeSourceHandler.AutoAssignMediaSources).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/auto-assign-vlc-sources", episodeSourceHandler.AutoAssignVLCSources).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/auto-assign-camera-types", episodeSourceHandler.AutoAssignCameraTypes).Methods("POST")
+	api.HandleFunc("/episodes/{episode_id}/camera-assignments", episodeSourceHandler.GetCameraAssignments).Methods("GET")
 	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/assign-camera-type", episodeSourceHandler.AssignCameraTypeToSource).Methods("POST")
 	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/camera-types-list", episodeSourceHandler.GetCameraTypesForModal).Methods("GET")
+
+	// Mikrof continue... (przypisywanie osób)
 	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/microphone-people-list", episodeSourceHandler.GetMicrophonePeopleList).Methods("GET")
 	api.HandleFunc("/episodes/{episode_id}/sources/{source_name}/assign-microphone-person", episodeSourceHandler.AssignMicrophonePerson).Methods("POST")
 

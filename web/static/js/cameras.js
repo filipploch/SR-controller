@@ -51,7 +51,7 @@ function renderCameraTypes() {
 // Otwórz modal dodawania
 function openCameraTypeModal() {
     editingId = null;
-    document.getElementById('modalTitle').textContent = 'Nowy Typ Kamery';
+    document.getElementById('modalCameraTitle').textContent = 'Nowy Typ Kamery';
     document.getElementById('cameraTypeForm').reset();
     document.getElementById('cameraTypeId').value = '';
     document.getElementById('cameraTypeModal').classList.add('active');
@@ -74,7 +74,7 @@ function editCameraType(id) {
     }
 
     editingId = id;
-    document.getElementById('modalTitle').textContent = 'Edytuj Typ Kamery';
+    document.getElementById('modalCameraTitle').textContent = 'Edytuj Typ Kamery';
     document.getElementById('cameraTypeId').value = type.id;
     document.getElementById('cameraTypeName').value = type.name;
     document.getElementById('cameraTypeModal').classList.add('active');

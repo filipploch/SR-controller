@@ -25,5 +25,5 @@ func GetMediaDuration(filePath string) (int, error) {
 		return 0, err
 	}
 
-	return int(duration), nil
+	return int(duration * 1000), nil
 }

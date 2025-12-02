@@ -10,8 +10,53 @@ const socket = io();
 const socketStatus = document.getElementById('socketStatus');
 const obsStatus = document.getElementById('obsStatus');
 
+let currentVLCModalSourceName = null;
+let vlcModalData = null;
+
+// Global state
+let episodes = [];
+let seasons = [];
+let allStaff = [];
+let allGuests = [];
+let staffTypes = [];
+let guestTypes = [];
+let sources = [];
+let currentEpisodeId = null;
+let assignedStaff = [];
+let assignedGuests = [];
+let assignedMedia = [];
+let availableMediaFiles = [];
+let mediaGroups = [];
+let currentMediaGroup = null;
+let currentModalSourceName = null;
+let modalData = null;
+
+document.getElementById('openSettings').addEventListener('click', function() {
+	showContentWindow("settingsWindow");});
+
+function showContentWindow(contentWindow) {
+	var openingDiv = document.getElementById(contentWindow);
+	var openSettingsDiv = document.getElementById("openSettings");
+	var contentWindows = document.getElementsByClassName("content-window");
+	Array.from(contentWindows).forEach(div => {
+	  if (!div.classList.contains("hidden")) {
+		div.classList.add("hidden");
+	  }
+	});
+	if (openingDiv.classList.contains("hidden")) {
+		openingDiv.classList.remove("hidden");
+	}
+	if (openingDiv.id != "controllerWindow") {
+		openSettingsDiv.textContent = "🎛️ Kontroler";
+		openSettingsDiv.addEventListener('click', function() {showContentWindow("controllerWindow");});
+	}else{
+		openSettingsDiv.textContent = "⚙️ Ustawienia";
+		openSettingsDiv.addEventListener('click', function() {showContentWindow("settingsWindow");});
+	}
+}
+
 // Funkcje przełączania zakładek
-function switchTab(group, tabName) {
+function switchControllerTab(group, tabName) {
     const tabButton = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
     const tabContent = document.getElementById(`tab-${tabName}`);
     
@@ -69,13 +114,13 @@ function obsTransition() {
 
 socket.on('connect', () => {
 	console.log('Połączono z Socket.IO');
-	socketStatus.classList.add('connected');
+	socketStatus.classList.add('status-ok');
 	loadAllScenes();
 });
 
 socket.on('disconnect', () => {
 	console.log('Rozłączono z Socket.IO');
-	socketStatus.classList.remove('connected');
+	socketStatus.classList.remove('status-ok');
 });
 
 socket.on('source_changed', (data) => {
@@ -117,7 +162,7 @@ function loadSceneSources(sceneName) {
 	// Najpierw synchronizuj kolejność z bazy do OBS
 	socket.emit('sync_source_order', JSON.stringify({
 		scene_name: sceneName
-	}), (syncResponse) => {
+	}), () => {
 		// Po synchronizacji pobierz źródła
 		socket.emit('get_sources', sceneName, (response) => {
 			try {
@@ -127,7 +172,7 @@ function loadSceneSources(sceneName) {
 					if (data.data.has_changes) {
 						showSaveButton(sceneName);
 					}
-					obsStatus.classList.add('connected');
+					obsStatus.classList.add('status-ok');
 				}
 			} catch (error) {
 				console.error('Błąd:', error);

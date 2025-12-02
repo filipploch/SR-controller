@@ -29,10 +29,10 @@ async function openCameraTypeModal(sourceName, sceneName) {
 
 // Renderuj modal z listą typów
 function renderCameraTypeModal(data, sourceName) {
-    const modalTitle = document.getElementById('camera-type-modal-title');
+    const modalCameraTypeTitle = document.getElementById('camera-type-modal-title');
     const modalBody = document.getElementById('camera-type-modal-body');
 
-    modalTitle.textContent = `Wybierz typ kamery - ${sourceName}`;
+    modalCameraTypeTitle.textContent = `Wybierz typ kamery - ${sourceName}`;
     modalBody.innerHTML = '';
 
     if (!data.camera_types || data.camera_types.length === 0) {

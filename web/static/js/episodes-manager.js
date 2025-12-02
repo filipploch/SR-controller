@@ -1,19 +1,3 @@
-// Global state
-let episodes = [];
-let seasons = [];
-let allStaff = [];
-let allGuests = [];
-let staffTypes = [];
-let guestTypes = [];
-let sources = [];
-let currentEpisodeId = null;
-let assignedStaff = [];
-let assignedGuests = [];
-let assignedMedia = [];
-let availableMediaFiles = [];
-let mediaGroups = [];
-let currentMediaGroup = null;
-
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
     loadSeasons();
@@ -80,7 +64,7 @@ function setupEventListeners() {
 }
 
 // ===== TAB SWITCHING =====
-function switchTab(tabName, sourceElement) {
+function switchEpisodeTab(tabName, sourceElement) {
     // Update tab buttons
     document.querySelectorAll('.modal-tab').forEach(tab => {
         tab.classList.remove('active');
@@ -231,7 +215,7 @@ function renderEpisodes() {
 }
 
 async function openCreateModal() {
-    document.getElementById('modalTitle').textContent = 'Nowy Odcinek';
+    document.getElementById('modalEpisodeTitle').textContent = 'Nowy Odcinek';
     document.getElementById('episodeForm').reset();
     document.getElementById('episodeId').value = '';
     currentEpisodeId = null;
@@ -266,7 +250,7 @@ async function openCreateModal() {
     document.getElementById('episodeDate').value = `${yyyy}-${mm}-${dd}`;
     
     // Switch to first tab
-    switchTab('data');
+    switchEpisodeTab('data');
     
     document.getElementById('episodeModal').classList.add('active');
 }
@@ -276,7 +260,7 @@ function openEditModal(id) {
     if (!episode) return;
 
     currentEpisodeId = id;
-    document.getElementById('modalTitle').textContent = 'Edycja Odcinka';
+    document.getElementById('modalEpisodeTitle').textContent = 'Edycja Odcinka';
     document.getElementById('episodeId').value = episode.id;
     document.getElementById('episodeSeason').value = episode.season_id;
     document.getElementById('episodeNumber').value = episode.episode_number;
@@ -291,7 +275,7 @@ function openEditModal(id) {
     document.getElementById('episodeIsCurrent').checked = episode.is_current;
     
     // Switch to first tab
-    switchTab('data');
+    switchEpisodeTab('data');
     
     document.getElementById('episodeModal').classList.add('active');
 }
@@ -1488,10 +1472,13 @@ async function removeMediaFromEpisode(mediaId) {
 }
 
 // ===== UTILITIES =====
-function formatDuration(seconds) {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+function formatDuration(milliseconds) {
+    const totalSeconds = milliseconds / 1000;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    const ms = Math.floor((milliseconds % 1000));
+    
+    return `${minutes}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
 }
 
 // ===== MEDIA GROUPS =====

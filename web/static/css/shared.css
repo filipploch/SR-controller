@@ -42,6 +42,10 @@ body {
     font-weight: 600;
 }
 
+#openSettings {
+    cursor: pointer;
+}
+
 .status {
     display: flex;
     gap: 15px;
@@ -62,7 +66,7 @@ body {
     animation: pulse 2s infinite;
 }
 
-.status-dot.connected {
+.status-dot.status-ok {
     background: #44ff44;
 }
 
@@ -396,4 +400,14 @@ textarea.form-control {
 .media-group-card:hover,
 .group-media-item:hover {
     background: rgba(102, 126, 234, 0.1);
+}
+
+.content-window {
+    width: 880px;
+    height: 233px;
+}
+
+.hidden {
+    visibility: hidden;
+    height: 0;
 }
