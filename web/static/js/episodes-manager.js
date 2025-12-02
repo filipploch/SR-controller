@@ -280,9 +280,29 @@ function openEditModal(id) {
     document.getElementById('episodeModal').classList.add('active');
 }
 
-function closeModal() {
+async function closeModal() {
     document.getElementById('episodeModal').classList.remove('active');
-    currentEpisodeId = null;
+    
+    // Przywróć currentEpisodeId do aktualnego odcinka
+    // (nie ustawiaj null, bo to czyści przypisania w kontrolerze!)
+    try {
+        const response = await fetch('/api/episodes?current=true');
+        const currentEpisodes = await response.json();
+        if (currentEpisodes && currentEpisodes.length > 0) {
+            currentEpisodeId = currentEpisodes[0].id;
+            
+            // Odśwież przypisania w kontrolerze
+            if (typeof loadAllSourceAssignments === 'function') {
+                await loadAllSourceAssignments();
+            }
+        } else {
+            currentEpisodeId = null;
+        }
+        console.log("currentEpisodeId: ", currentEpisodeId);
+    } catch (error) {
+        console.error('Błąd przywracania aktualnego odcinka:', error);
+        currentEpisodeId = null;
+    }
 }
 
 async function saveEpisode() {

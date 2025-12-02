@@ -69,6 +69,31 @@ func (h *EpisodeHandler) GetEpisode(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateEpisode - POST /api/episodes
+// func (h *EpisodeHandler) CreateEpisode(w http.ResponseWriter, r *http.Request) {
+// 	var episode models.Episode
+// 	if err := json.NewDecoder(r.Body).Decode(&episode); err != nil {
+// 		http.Error(w, err.Error(), http.StatusBadRequest)
+// 		return
+// 	}
+
+// 	// Jeśli ma być aktualny, użyj funkcji pomocniczej
+// 	if episode.IsCurrent {
+// 		if err := models.CreateEpisodeAsCurrent(h.DB, &episode); err != nil {
+// 			http.Error(w, err.Error(), http.StatusInternalServerError)
+// 			return
+// 		}
+// 	} else {
+// 		if err := h.DB.Create(&episode).Error; err != nil {
+// 			http.Error(w, err.Error(), http.StatusInternalServerError)
+// 			return
+// 		}
+// 	}
+
+// 	w.Header().Set("Content-Type", "application/json")
+// 	w.WriteHeader(http.StatusCreated)
+// 	json.NewEncoder(w).Encode(episode)
+// }
+
 func (h *EpisodeHandler) CreateEpisode(w http.ResponseWriter, r *http.Request) {
 	var episode models.Episode
 	if err := json.NewDecoder(r.Body).Decode(&episode); err != nil {
@@ -76,17 +101,29 @@ func (h *EpisodeHandler) CreateEpisode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Jeśli ma być aktualny, użyj funkcji pomocniczej
-	if episode.IsCurrent {
-		if err := models.CreateEpisodeAsCurrent(h.DB, &episode); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+	// Użyj transakcji
+	err := h.DB.Transaction(func(tx *gorm.DB) error {
+		// Jeśli ma być aktualny, wyłącz inne
+		if episode.IsCurrent {
+			if err := tx.Model(&models.Episode{}).
+				Where("is_current = ?", true).
+				Update("is_current", false).Error; err != nil {
+				return err
+			}
 		}
-	} else {
-		if err := h.DB.Create(&episode).Error; err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+
+		// Utwórz odcinek
+		if err := tx.Create(&episode).Error; err != nil {
+			return err
 		}
+
+		// Zawsze twórz grupy systemowe
+		return models.CreateSystemMediaGroupsForEpisode(tx, episode.ID)
+	})
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -230,7 +267,7 @@ func (h *EpisodeHandler) GetNextEpisodeNumbers(w http.ResponseWriter, r *http.Re
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"current_season_id":  currentSeasonID,
+		"current_season_id":   currentSeasonID,
 		"next_episode_number": nextEpisodeNumber,
 		"next_season_episode": nextSeasonEpisode,
 	})

@@ -66,31 +66,10 @@ func (h *EpisodeSourceHandler) AssignMediaToSource(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Wczytaj plik do OBS (jeśli połączony)
-	if h.OBSClient != nil && h.OBSClient.IsConnected() {
-		// Pobierz bezwzględną ścieżkę
-		absMediaPath, err := filepath.Abs(h.MediaPath)
-		if err != nil {
-			absMediaPath = h.MediaPath
-		}
-
-		// Zbuduj pełną ścieżkę
-		fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*media.FilePath))
-		playlist := make([]map[string]interface{}, 0)
-		playlist = append(playlist, map[string]interface{}{
-			"value": fullPath,
-		})
-		// Ustaw plik w źródle Media Source
-		err = h.OBSClient.SetInputSettings(sourceName, map[string]interface{}{
-			"playlist": playlist,
-			"loop":     false,
-			"shuffle":  false,
-		})
-
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to set media in OBS: %v", err), http.StatusInternalServerError)
-			return
-		}
+	// Wczytaj plik do OBS używając helper function
+	if err := h.setVLCPlaylistFromMedia(sourceName, &media); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to set media in OBS: %v", err), http.StatusInternalServerError)
+		return
 	}
 
 	// Zapisz przypisanie w bazie danych
@@ -291,29 +270,10 @@ func (h *EpisodeSourceHandler) autoAssignForSource(episodeID uint, sourceName st
 		return false, 0, ""
 	}
 
-	// Wczytaj plik do OBS (jeśli połączony)
-	if h.OBSClient != nil && h.OBSClient.IsConnected() {
-		absMediaPath, err := filepath.Abs(h.MediaPath)
-		if err != nil {
-			absMediaPath = h.MediaPath
-		}
-
-		fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*media.FilePath))
-		playlist := make([]map[string]interface{}, 0)
-		playlist = append(playlist, map[string]interface{}{
-			"value": fullPath,
-		})
-		// Ustaw plik w źródle Media Source
-		err = h.OBSClient.SetInputSettings(sourceName, map[string]interface{}{
-			"playlist": playlist,
-			"loop":     false,
-			"shuffle":  false,
-		})
-
-		if err != nil {
-			fmt.Printf("Błąd ustawiania automatycznego pliku w OBS dla %s: %v\n", sourceName, err)
-			return false, 0, ""
-		}
+	// Wczytaj plik do OBS używając helper function
+	if err := h.setVLCPlaylistFromMedia(sourceName, &media); err != nil {
+		fmt.Printf("Błąd ustawiania automatycznego pliku w OBS dla %s: %v\n", sourceName, err)
+		return false, 0, ""
 	}
 
 	// Zapisz przypisanie
@@ -430,46 +390,14 @@ func (h *EpisodeSourceHandler) autoAssignVLCForSource(episodeID uint, sourceName
 		return false, 0, ""
 	}
 
-	// Przygotuj playlistę dla VLC Video Source
-	playlist := make([]map[string]interface{}, 0)
-
-	absMediaPath, err := filepath.Abs(h.MediaPath)
-	if err != nil {
-		absMediaPath = h.MediaPath
-	}
-
-	for _, item := range selectedGroup.MediaItems {
-		// EpisodeMedia jest już załadowane przez Preload("MediaItems.EpisodeMedia")
-		media := item.EpisodeMedia
-
-		if media.FilePath != nil && *media.FilePath != "" {
-			fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*media.FilePath))
-			playlist = append(playlist, map[string]interface{}{
-				"value": fullPath,
-			})
-		}
-	}
-
-	if len(playlist) == 0 {
-		fmt.Printf("Auto-assign VLC: brak prawidłowych plików w grupie %s\n", selectedGroup.Name)
+	// Wczytaj playlistę do OBS używając helper function
+	if err := h.setVLCPlaylistFromGroup(sourceName, selectedGroup); err != nil {
+		fmt.Printf("Błąd ustawiania automatycznej playlisty w OBS dla %s: %v\n", sourceName, err)
 		return false, 0, ""
 	}
 
-	// Wczytaj playlistę do OBS (jeśli połączony)
-	if h.OBSClient != nil && h.OBSClient.IsConnected() {
-		err = h.OBSClient.SetInputSettings(sourceName, map[string]interface{}{
-			"playlist": playlist,
-			"loop":     false,
-			"shuffle":  false,
-		})
-
-		if err != nil {
-			fmt.Printf("Błąd ustawiania automatycznej playlisty w OBS dla %s: %v\n", sourceName, err)
-			return false, 0, ""
-		}
-
-		fmt.Printf("Auto-assign VLC: wczytano %d plików do źródła %s\n", len(playlist), sourceName)
-	}
+	fmt.Printf("Auto-assign VLC: wczytano grupę %s (%d plików) do źródła %s\n",
+		selectedGroup.Name, len(selectedGroup.MediaItems), sourceName)
 
 	// Zapisz przypisanie
 	err = models.SetEpisodeSourceGroup(h.DB, episodeID, sourceName, selectedGroup.ID, "auto")
@@ -530,43 +458,10 @@ func (h *EpisodeSourceHandler) AssignGroupToSource(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Przygotuj playlistę dla VLC Video Source
-	playlist := make([]map[string]interface{}, 0)
-
-	absMediaPath, err := filepath.Abs(h.MediaPath)
-	if err != nil {
-		absMediaPath = h.MediaPath
-	}
-
-	for _, item := range group.MediaItems {
-		// EpisodeMedia jest już załadowane przez Preload("MediaItems.EpisodeMedia")
-		media := item.EpisodeMedia
-
-		if media.FilePath != nil && *media.FilePath != "" {
-			fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*media.FilePath))
-			playlist = append(playlist, map[string]interface{}{
-				"value": fullPath,
-			})
-		}
-	}
-
-	if len(playlist) == 0 {
-		http.Error(w, "No valid files in group", http.StatusBadRequest)
+	// Wczytaj playlistę do OBS używając helper function
+	if err := h.setVLCPlaylistFromGroup(sourceName, &group); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to set OBS playlist: %v", err), http.StatusInternalServerError)
 		return
-	}
-
-	// Wczytaj playlistę do OBS (jeśli połączony)
-	if h.OBSClient != nil && h.OBSClient.IsConnected() {
-		err = h.OBSClient.SetInputSettings(sourceName, map[string]interface{}{
-			"playlist": playlist,
-			"loop":     false,
-			"shuffle":  false,
-		})
-
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to set OBS playlist: %v", err), http.StatusInternalServerError)
-			return
-		}
 	}
 
 	// Zapisz przypisanie jako "manual"
@@ -1129,4 +1024,99 @@ func (h *EpisodeSourceHandler) GetCameraAssignments(w http.ResponseWriter, r *ht
 	// Zwróć przypisania (bez żadnego broadcast)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
+}
+
+// ===================================================================
+// HELPER FUNCTIONS - VLC Playlist Management
+// ===================================================================
+
+// setVLCPlaylistSingle ustawia pojedynczy plik w źródle VLC (Media1, Reportaze1)
+// Zwraca error jeśli wystąpił problem z OBS
+func (h *EpisodeSourceHandler) setVLCPlaylistSingle(sourceName string, filePath string) error {
+	if h.OBSClient == nil || !h.OBSClient.IsConnected() {
+		return nil // OBS nie połączony - to nie jest błąd
+	}
+
+	// Przygotuj playlist z jednym plikiem
+	absMediaPath, err := filepath.Abs(h.MediaPath)
+	if err != nil {
+		absMediaPath = h.MediaPath
+	}
+
+	fullPath := filepath.Join(absMediaPath, filepath.FromSlash(filePath))
+	playlist := []map[string]interface{}{
+		{"value": fullPath},
+	}
+
+	// Ustaw w OBS
+	return h.OBSClient.SetInputSettings(sourceName, map[string]interface{}{
+		"playlist": playlist,
+		"loop":     false,
+		"shuffle":  false,
+	})
+}
+
+// setVLCPlaylistMultiple ustawia wiele plików w źródle VLC (Media2, Reportaze2)
+// Zwraca error jeśli wystąpił problem z OBS
+func (h *EpisodeSourceHandler) setVLCPlaylistMultiple(sourceName string, filePaths []string) error {
+	if h.OBSClient == nil || !h.OBSClient.IsConnected() {
+		return nil // OBS nie połączony - to nie jest błąd
+	}
+
+	if len(filePaths) == 0 {
+		return fmt.Errorf("no files provided for playlist")
+	}
+
+	// Przygotuj playlist z wieloma plikami
+	absMediaPath, err := filepath.Abs(h.MediaPath)
+	if err != nil {
+		absMediaPath = h.MediaPath
+	}
+
+	playlist := make([]map[string]interface{}, 0, len(filePaths))
+	for _, relPath := range filePaths {
+		if relPath != "" {
+			fullPath := filepath.Join(absMediaPath, filepath.FromSlash(relPath))
+			playlist = append(playlist, map[string]interface{}{
+				"value": fullPath,
+			})
+		}
+	}
+
+	if len(playlist) == 0 {
+		return fmt.Errorf("no valid files in playlist")
+	}
+
+	// Ustaw w OBS
+	return h.OBSClient.SetInputSettings(sourceName, map[string]interface{}{
+		"playlist": playlist,
+		"loop":     false,
+		"shuffle":  false,
+	})
+}
+
+// setVLCPlaylistFromMedia ustawia playlist dla pojedynczego media (wrapper dla setVLCPlaylistSingle)
+func (h *EpisodeSourceHandler) setVLCPlaylistFromMedia(sourceName string, media *models.EpisodeMedia) error {
+	if media.FilePath == nil || *media.FilePath == "" {
+		return fmt.Errorf("media has no file path")
+	}
+	return h.setVLCPlaylistSingle(sourceName, *media.FilePath)
+}
+
+// setVLCPlaylistFromGroup ustawia playlist z grupy mediów (wrapper dla setVLCPlaylistMultiple)
+func (h *EpisodeSourceHandler) setVLCPlaylistFromGroup(sourceName string, group *models.MediaGroup) error {
+	if len(group.MediaItems) == 0 {
+		return fmt.Errorf("group has no media items")
+	}
+
+	// Zbierz ścieżki plików z grupy
+	filePaths := make([]string, 0, len(group.MediaItems))
+	for _, item := range group.MediaItems {
+		media := item.EpisodeMedia
+		if media.FilePath != nil && *media.FilePath != "" {
+			filePaths = append(filePaths, *media.FilePath)
+		}
+	}
+
+	return h.setVLCPlaylistMultiple(sourceName, filePaths)
 }

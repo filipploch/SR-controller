@@ -427,38 +427,19 @@ func (h *EpisodeMediaHandler) GetCurrentMediaForScene(w http.ResponseWriter, r *
 
 	currentMedia := assignment.EpisodeMedia
 
-	// Jeśli mamy plik i OBS jest połączony, ustaw go w źródle
-	if currentMedia.FilePath != nil && *currentMedia.FilePath != "" && h.OBSClient != nil && h.OBSClient.IsConnected() {
-		// Pobierz bezwzględną ścieżkę do katalogu aplikacji
-		absMediaPath, err := filepath.Abs(h.MediaPath)
-		if err != nil {
-			absMediaPath = h.MediaPath
-		}
-
-		// Zbuduj pełną ścieżkę: C:/Users/.../media/season_1/file.mp4
-		fullPath := filepath.Join(absMediaPath, filepath.FromSlash(*currentMedia.FilePath))
-
-		playlist := make([]map[string]interface{}, 0)
-		playlist = append(playlist, map[string]interface{}{
-			"value": fullPath,
-		})
+	// Jeśli mamy plik, ustaw go w źródle
+	if currentMedia.FilePath != nil && *currentMedia.FilePath != "" {
 		// Określ nazwę źródła w OBS na podstawie nazwy sceny
-		var inputName string
+		var sourceName string
 		if sceneName == "MEDIA" {
-			inputName = "Media1"
+			sourceName = "Media1"
 		} else if sceneName == "REPORTAZE" {
-			inputName = "Reportaze1"
+			sourceName = "Reportaze1"
 		}
 
-		if inputName != "" {
-			// Ustaw ustawienia źródła w OBS
-			err = h.OBSClient.SetInputSettings(inputName, map[string]interface{}{
-				"playlist": playlist,
-				"loop":     false,
-				"shuffle":  false,
-			})
-
-			if err != nil {
+		if sourceName != "" {
+			// Ustaw plik w OBS używając helper function
+			if err := h.setVLCPlaylistFromMedia(sourceName, &currentMedia); err != nil {
 				http.Error(w, fmt.Sprintf("Failed to set OBS playlist: %v", err), http.StatusInternalServerError)
 				return
 			}
@@ -475,4 +456,42 @@ func (h *EpisodeMediaHandler) GetCurrentMediaForScene(w http.ResponseWriter, r *
 		"duration":  currentMedia.Duration,
 		"group":     assignment.MediaGroup.Name,
 	})
+}
+
+// ===================================================================
+// HELPER FUNCTIONS - VLC Playlist Management
+// ===================================================================
+
+// setVLCPlaylistSingle ustawia pojedynczy plik w źródle VLC
+// sourceName może być "Media1" lub "Reportaze1"
+func (h *EpisodeMediaHandler) setVLCPlaylistSingle(sourceName string, filePath string) error {
+	if h.OBSClient == nil || !h.OBSClient.IsConnected() {
+		return nil // OBS nie połączony - to nie jest błąd
+	}
+
+	// Przygotuj playlist z jednym plikiem
+	absMediaPath, err := filepath.Abs(h.MediaPath)
+	if err != nil {
+		absMediaPath = h.MediaPath
+	}
+
+	fullPath := filepath.Join(absMediaPath, filepath.FromSlash(filePath))
+	playlist := []map[string]interface{}{
+		{"value": fullPath},
+	}
+
+	// Ustaw w OBS
+	return h.OBSClient.SetInputSettings(sourceName, map[string]interface{}{
+		"playlist": playlist,
+		"loop":     false,
+		"shuffle":  false,
+	})
+}
+
+// setVLCPlaylistFromMedia ustawia playlist dla pojedynczego media
+func (h *EpisodeMediaHandler) setVLCPlaylistFromMedia(sourceName string, media *models.EpisodeMedia) error {
+	if media.FilePath == nil || *media.FilePath == "" {
+		return fmt.Errorf("media has no file path")
+	}
+	return h.setVLCPlaylistSingle(sourceName, *media.FilePath)
 }

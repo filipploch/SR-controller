@@ -52,6 +52,14 @@ function showContentWindow(contentWindow) {
 	}else{
 		openSettingsDiv.textContent = "⚙️ Ustawienia";
 		openSettingsDiv.addEventListener('click', function() {showContentWindow("settingsWindow");});
+		if (typeof loadAllSourceAssignments === 'function') {
+            loadAllSourceAssignments();
+		}
+		if (typeof switchControllerTab === 'function') {
+            switchControllerTab('media-reportaze', 'media');
+			switchControllerTab('mikrofony-muzyka', 'mikrofony');
+		}
+		
 	}
 }
 
