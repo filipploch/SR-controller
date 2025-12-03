@@ -130,7 +130,7 @@
         <div id="seasonsWindow" class="content-window hidden">
             <div class="toolbar">
                 <div></div>
-                <button class="btn btn-primary btn-small" onclick="openCreateModal()">+ Nowy Sezon</button>
+                <button class="btn btn-primary btn-small" onclick="openCreateSeasonModal()">+ Nowy Sezon</button>
             </div>
 
             <div class="scrollable">
@@ -159,7 +159,7 @@
                         <option value="">Wszystkie</option>
                     </select>
                 </div>
-                <button class="btn btn-primary btn-small" onclick="openCreateModal()">+ Nowy Odcinek</button>
+                <button class="btn btn-primary btn-small" onclick="openCreateEpisodeModal()">+ Nowy Odcinek</button>
             </div>
 
             <div class="scrollable">
@@ -233,7 +233,7 @@
             <div class="panel">
                 <div class="panel-header">
                     <h2>Typy Kamer</h2>
-                    <button class="btn btn-primary btn-small" onclick="openCameraTypeModal()">+ Dodaj Typ</button>
+                    <button class="btn btn-primary btn-small" onclick="openCameraTypeModalForManagement()">+ Dodaj Typ</button>
                 </div>
                 <div class="scrollable" id="cameraTypesContainer">
                     <div class="loading">Ładowanie...</div>
@@ -318,7 +318,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modalSeasonTitle">Nowy Sezon</h2>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <button class="modal-close" onclick="closeSeasonModal()">&times;</button>
             </div>
             <form id="seasonForm">
                 <input type="hidden" id="seasonId">
@@ -337,7 +337,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn" onclick="closeModal()">Anuluj</button>
+                    <button type="button" class="btn" onclick="closeSeasonModal()">Anuluj</button>
                     <button type="submit" class="btn btn-primary">Zapisz</button>
                 </div>
             </form>
@@ -349,7 +349,7 @@
         <div class="modal-content modal-content-large">
             <div class="modal-header">
                 <h2 id="modalEpisodeTitle">Nowy Odcinek</h2>
-                <button type="button" class="modal-close" onclick="closeModal()">&times;</button>
+                <button type="button" class="modal-close" onclick="closeEpisodeModal()">&times;</button>
             </div>
 
             <!-- Zakładki -->
@@ -504,7 +504,7 @@
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn" onclick="closeModal()">Zamknij</button>
+                <button type="button" class="btn" onclick="closeEpisodeModal()">Zamknij</button>
                 <button type="button" class="btn btn-primary" onclick="saveEpisode()">Zapisz Odcinek</button>
             </div>
         </div>
