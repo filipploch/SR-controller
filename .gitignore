@@ -42,3 +42,6 @@ profile.out
 
 # Pliki backup
 backup*.*
+
+# Plik z danymi testowymi
+test-data.json

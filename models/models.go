@@ -1,7 +1,9 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"gorm.io/gorm"
@@ -256,6 +258,11 @@ func InitDB(db *gorm.DB) error {
 
 	// Dodaj unikalny indeks na parę (episode_id, source_name) dla episode_sources
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_episode_source ON episode_sources(episode_id, source_name)")
+
+	// Załaduj dane testowe jeśli baza jest pusta i plik test-data.json istnieje
+	if err := LoadTestDataIfEmpty(db); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -1013,4 +1020,433 @@ func SeedCameraTypes(db *gorm.DB) error {
 	}
 
 	return nil
+}
+
+// ===================================================================
+// TEST DATA LOADING
+// ===================================================================
+
+// TestData reprezentuje strukturę pliku test-data.json
+type TestData struct {
+	Seasons        []TestSeason        `json:"seasons"`
+	Episodes       []TestEpisode       `json:"episodes"`
+	StaffTypes     []TestStaffType     `json:"staff_types"`
+	Staff          []TestStaff         `json:"staff"`
+	EpisodeStaff   []TestEpisodeStaff  `json:"episode_staff"`
+	GuestTypes     []TestGuestType     `json:"guest_types"`
+	Guests         []TestGuest         `json:"guests"`
+	EpisodeGuests  []TestEpisodeGuest  `json:"episode_guests"`
+	Scenes         []TestScene         `json:"scenes"`
+	Sources        []TestSource        `json:"sources"`
+	EpisodeSources []TestEpisodeSource `json:"episode_sources"`
+	EpisodeMedia   []TestEpisodeMedia  `json:"episode_media"`
+}
+
+type TestSeason struct {
+	Number      int    `json:"number"`
+	Description string `json:"description"`
+	IsCurrent   bool   `json:"is_current"`
+}
+
+type TestEpisode struct {
+	SeasonID      int    `json:"season_id"`
+	EpisodeNumber int    `json:"episode_number"`
+	SeasonEpisode int    `json:"season_episode"`
+	Title         string `json:"title"`
+	EpisodeDate   string `json:"episode_date"`
+	IsCurrent     bool   `json:"is_current"`
+}
+
+type TestStaffType struct {
+	Name string `json:"name"`
+}
+
+type TestStaff struct {
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+}
+
+type TestEpisodeStaff struct {
+	EpisodeID    int   `json:"episode_id"`
+	StaffID      int   `json:"staff_id"`
+	StaffTypeIDs []int `json:"staff_type_ids"`
+}
+
+type TestGuestType struct {
+	Name string `json:"name"`
+}
+
+type TestGuest struct {
+	GuestTypeID int    `json:"guest_type_id"`
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name"`
+}
+
+type TestEpisodeGuest struct {
+	EpisodeID int `json:"episode_id"`
+	GuestID   int `json:"guest_id"`
+}
+
+type TestScene struct {
+	Name string `json:"name"`
+}
+
+type TestSource struct {
+	SceneName  string `json:"scene_name"`
+	Name       string `json:"name"`
+	SourceType string `json:"source_type"`
+	Order      int    `json:"order"`
+	IsVisible  bool   `json:"is_visible"`
+}
+
+type TestEpisodeSource struct {
+	EpisodeID    int    `json:"episode_id"`
+	SourceName   string `json:"source_name"`
+	MediaID      *int   `json:"media_id"`
+	GroupID      *int   `json:"group_id"`
+	CameraTypeID *int   `json:"camera_type_id"`
+	StaffID      *int   `json:"staff_id"`
+	GuestID      *int   `json:"guest_id"`
+	AssignedBy   string `json:"assigned_by"`
+}
+
+type TestEpisodeMedia struct {
+	EpisodeID      int                     `json:"episode_id"`
+	EpisodeStaffID *int                    `json:"episode_staff_id"`
+	Title          string                  `json:"title"`
+	Description    string                  `json:"description"`
+	FilePath       string                  `json:"file_path"`
+	URL            string                  `json:"url"`
+	Duration       int                     `json:"duration"`
+	Groups         []TestEpisodeMediaGroup `json:"groups"`
+}
+
+type TestEpisodeMediaGroup struct {
+	GroupID int `json:"group_id"`
+	Order   int `json:"order"`
+}
+
+// LoadTestDataIfEmpty ładuje dane testowe z pliku test-data.json jeśli baza jest pusta
+func LoadTestDataIfEmpty(db *gorm.DB) error {
+	// Sprawdź czy baza jest pusta (brak sezonów)
+	var count int64
+	if err := db.Model(&Season{}).Count(&count).Error; err != nil {
+		return err
+	}
+
+	if count > 0 {
+		// Baza nie jest pusta - pomiń ładowanie
+		fmt.Println("Baza danych zawiera dane - pomijam ładowanie test-data.json")
+		return nil
+	}
+
+	// Sprawdź czy plik test-data.json istnieje
+	testDataPath := "test-data.json"
+	if _, err := os.Stat(testDataPath); os.IsNotExist(err) {
+		// Plik nie istnieje - pomiń ładowanie
+		fmt.Println("Plik test-data.json nie istnieje - pomijam ładowanie danych testowych")
+		return nil
+	}
+
+	fmt.Println("Wykryto pusty bazę danych i plik test-data.json - ładuję dane testowe...")
+
+	// Wczytaj plik JSON
+	data, err := os.ReadFile(testDataPath)
+	if err != nil {
+		return fmt.Errorf("błąd odczytu test-data.json: %v", err)
+	}
+
+	// Parsuj JSON
+	var testData TestData
+	if err := json.Unmarshal(data, &testData); err != nil {
+		return fmt.Errorf("błąd parsowania test-data.json: %v", err)
+	}
+
+	// Załaduj dane w transakcji
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Mapy do przechowywania ID utworzonych rekordów
+		seasonIDs := make(map[int]uint)       // test season index -> real ID
+		episodeIDs := make(map[int]uint)      // test episode index -> real ID
+		staffTypeIDs := make(map[int]uint)    // test staff_type index -> real ID
+		staffIDs := make(map[int]uint)        // test staff index -> real ID
+		episodeStaffIDs := make(map[int]uint) // test episode_staff index -> real ID
+		guestTypeIDs := make(map[int]uint)    // test guest_type index -> real ID
+		guestIDs := make(map[int]uint)        // test guest index -> real ID
+		sceneIDs := make(map[string]uint)     // scene name -> real ID
+		mediaIDs := make(map[int]uint)        // test media index -> real ID
+
+		// 1. Załaduj sezony
+		for idx, testSeason := range testData.Seasons {
+			season := Season{
+				Number:      testSeason.Number,
+				Description: testSeason.Description,
+				IsCurrent:   testSeason.IsCurrent,
+			}
+
+			if err := tx.Create(&season).Error; err != nil {
+				return fmt.Errorf("błąd tworzenia sezonu: %v", err)
+			}
+
+			seasonIDs[idx+1] = season.ID
+			fmt.Printf("  ✓ Utworzono sezon #%d: %s (ID=%d)\n", season.Number, season.Description, season.ID)
+		}
+
+		// 2. Załaduj odcinki
+		for idx, testEpisode := range testData.Episodes {
+			// Parsuj datę
+			episodeDate, err := time.Parse(time.RFC3339, testEpisode.EpisodeDate)
+			if err != nil {
+				return fmt.Errorf("błąd parsowania daty odcinka: %v", err)
+			}
+
+			episode := Episode{
+				SeasonID:      seasonIDs[testEpisode.SeasonID],
+				EpisodeNumber: testEpisode.EpisodeNumber,
+				SeasonEpisode: testEpisode.SeasonEpisode,
+				Title:         testEpisode.Title,
+				EpisodeDate:   episodeDate,
+				IsCurrent:     testEpisode.IsCurrent,
+			}
+
+			if err := tx.Create(&episode).Error; err != nil {
+				return fmt.Errorf("błąd tworzenia odcinka: %v", err)
+			}
+
+			episodeIDs[idx+1] = episode.ID
+			fmt.Printf("  ✓ Utworzono odcinek #%d: %s (ID=%d)\n", episode.EpisodeNumber, episode.Title, episode.ID)
+
+			// Jeśli odcinek jest aktualny, utwórz grupy systemowe
+			if episode.IsCurrent {
+				if err := CreateSystemMediaGroupsForEpisode(tx, episode.ID); err != nil {
+					return fmt.Errorf("błąd tworzenia grup systemowych: %v", err)
+				}
+				fmt.Printf("  ✓ Utworzono grupy systemowe dla odcinka #%d\n", episode.EpisodeNumber)
+			}
+		}
+
+		// 3. Załaduj staff types
+		for idx, testStaffType := range testData.StaffTypes {
+			staffType := StaffType{
+				Name: testStaffType.Name,
+			}
+
+			if err := tx.Create(&staffType).Error; err != nil {
+				return fmt.Errorf("błąd tworzenia staff type: %v", err)
+			}
+
+			staffTypeIDs[idx+1] = staffType.ID
+			fmt.Printf("  ✓ Utworzono staff type: %s (ID=%d)\n", staffType.Name, staffType.ID)
+		}
+
+		// 4. Załaduj staff
+		for idx, testStaff := range testData.Staff {
+			staff := Staff{
+				FirstName: testStaff.FirstName,
+				LastName:  testStaff.LastName,
+			}
+
+			if err := tx.Create(&staff).Error; err != nil {
+				return fmt.Errorf("błąd tworzenia staff: %v", err)
+			}
+
+			staffIDs[idx+1] = staff.ID
+			fmt.Printf("  ✓ Utworzono staff: %s %s (ID=%d)\n", staff.FirstName, staff.LastName, staff.ID)
+		}
+
+		// 5. Załaduj episode_staff
+		for idx, testEpisodeStaff := range testData.EpisodeStaff {
+			episodeStaff := EpisodeStaff{
+				EpisodeID: episodeIDs[testEpisodeStaff.EpisodeID],
+				StaffID:   staffIDs[testEpisodeStaff.StaffID],
+			}
+
+			if err := tx.Create(&episodeStaff).Error; err != nil {
+				return fmt.Errorf("błąd tworzenia episode staff: %v", err)
+			}
+
+			episodeStaffIDs[idx+1] = episodeStaff.ID
+			fmt.Printf("  ✓ Utworzono episode staff (ID=%d)\n", episodeStaff.ID)
+
+			// Dodaj typy dla tego przypisania
+			for _, staffTypeID := range testEpisodeStaff.StaffTypeIDs {
+				episodeStaffType := EpisodeStaffType{
+					EpisodeStaffID: episodeStaff.ID,
+					StaffTypeID:    staffTypeIDs[staffTypeID],
+				}
+
+				if err := tx.Create(&episodeStaffType).Error; err != nil {
+					return fmt.Errorf("błąd tworzenia episode staff type: %v", err)
+				}
+			}
+		}
+
+		// 6. Załaduj guest types
+		for idx, testGuestType := range testData.GuestTypes {
+			guestType := GuestType{
+				Name: testGuestType.Name,
+			}
+
+			if err := tx.Create(&guestType).Error; err != nil {
+				return fmt.Errorf("błąd tworzenia guest type: %v", err)
+			}
+
+			guestTypeIDs[idx+1] = guestType.ID
+			fmt.Printf("  ✓ Utworzono guest type: %s (ID=%d)\n", guestType.Name, guestType.ID)
+		}
+
+		// 7. Załaduj guests
+		for idx, testGuest := range testData.Guests {
+			guest := Guest{
+				GuestTypeID: guestTypeIDs[testGuest.GuestTypeID],
+				FirstName:   testGuest.FirstName,
+				LastName:    testGuest.LastName,
+			}
+
+			if err := tx.Create(&guest).Error; err != nil {
+				return fmt.Errorf("błąd tworzenia guest: %v", err)
+			}
+
+			guestIDs[idx+1] = guest.ID
+			fmt.Printf("  ✓ Utworzono guest: %s %s (ID=%d)\n", guest.FirstName, guest.LastName, guest.ID)
+		}
+
+		// 8. Załaduj episode_guests
+		for _, testEpisodeGuest := range testData.EpisodeGuests {
+			episodeGuest := EpisodeGuest{
+				EpisodeID: episodeIDs[testEpisodeGuest.EpisodeID],
+				GuestID:   guestIDs[testEpisodeGuest.GuestID],
+			}
+
+			if err := tx.Create(&episodeGuest).Error; err != nil {
+				return fmt.Errorf("błąd tworzenia episode guest: %v", err)
+			}
+
+			fmt.Printf("  ✓ Utworzono episode guest (ID=%d)\n", episodeGuest.ID)
+		}
+
+		// 9. Załaduj scenes
+		for _, testScene := range testData.Scenes {
+			scene := Scene{
+				Name: testScene.Name,
+			}
+
+			if err := tx.Create(&scene).Error; err != nil {
+				return fmt.Errorf("błąd tworzenia scene: %v", err)
+			}
+
+			sceneIDs[scene.Name] = scene.ID
+			fmt.Printf("  ✓ Utworzono scene: %s (ID=%d)\n", scene.Name, scene.ID)
+		}
+
+		// 10. Załaduj sources
+		for _, testSource := range testData.Sources {
+			source := Source{
+				SceneID:     sceneIDs[testSource.SceneName],
+				Name:        testSource.Name,
+				SourceType:  testSource.SourceType,
+				SourceOrder: testSource.Order,
+				IsVisible:   testSource.IsVisible,
+			}
+
+			if err := tx.Create(&source).Error; err != nil {
+				return fmt.Errorf("błąd tworzenia source: %v", err)
+			}
+
+			fmt.Printf("  ✓ Utworzono source: %s w scenie %s (ID=%d)\n", source.Name, testSource.SceneName, source.ID)
+		}
+
+		// 11. Załaduj episode_media
+		for idx, testMedia := range testData.EpisodeMedia {
+			var episodeStaffID *uint
+			if testMedia.EpisodeStaffID != nil {
+				id := episodeStaffIDs[*testMedia.EpisodeStaffID]
+				episodeStaffID = &id
+			}
+
+			// Konwertuj string na *string
+			var filePath, url *string
+			if testMedia.FilePath != "" {
+				filePath = &testMedia.FilePath
+			}
+			if testMedia.URL != "" {
+				url = &testMedia.URL
+			}
+
+			media := EpisodeMedia{
+				EpisodeID:      episodeIDs[testMedia.EpisodeID],
+				EpisodeStaffID: episodeStaffID,
+				Title:          testMedia.Title,
+				Description:    testMedia.Description,
+				FilePath:       filePath,
+				URL:            url,
+				Duration:       testMedia.Duration,
+			}
+
+			if err := tx.Create(&media).Error; err != nil {
+				return fmt.Errorf("błąd tworzenia episode media: %v", err)
+			}
+
+			mediaIDs[idx+1] = media.ID
+			fmt.Printf("  ✓ Utworzono episode media: %s (ID=%d)\n", media.Title, media.ID)
+
+			// Dodaj do grup
+			for _, testGroup := range testMedia.Groups {
+				episodeMediaGroup := EpisodeMediaGroup{
+					EpisodeMediaID: media.ID,
+					MediaGroupID:   uint(testGroup.GroupID),
+					Order:          testGroup.Order,
+				}
+
+				if err := tx.Create(&episodeMediaGroup).Error; err != nil {
+					return fmt.Errorf("błąd tworzenia episode media group: %v", err)
+				}
+			}
+		}
+
+		// 12. Załaduj episode_sources
+		for _, testEpisodeSource := range testData.EpisodeSources {
+			var mediaID, groupID, cameraTypeID, staffID, guestID *uint
+
+			if testEpisodeSource.MediaID != nil {
+				id := mediaIDs[*testEpisodeSource.MediaID]
+				mediaID = &id
+			}
+			if testEpisodeSource.GroupID != nil {
+				id := uint(*testEpisodeSource.GroupID)
+				groupID = &id
+			}
+			if testEpisodeSource.CameraTypeID != nil {
+				id := uint(*testEpisodeSource.CameraTypeID)
+				cameraTypeID = &id
+			}
+			if testEpisodeSource.StaffID != nil {
+				id := staffIDs[*testEpisodeSource.StaffID]
+				staffID = &id
+			}
+			if testEpisodeSource.GuestID != nil {
+				id := guestIDs[*testEpisodeSource.GuestID]
+				guestID = &id
+			}
+
+			episodeSource := EpisodeSource{
+				EpisodeID:    episodeIDs[testEpisodeSource.EpisodeID],
+				SourceName:   testEpisodeSource.SourceName,
+				MediaID:      mediaID,
+				GroupID:      groupID,
+				CameraTypeID: cameraTypeID,
+				StaffID:      staffID,
+				GuestID:      guestID,
+				AssignedBy:   testEpisodeSource.AssignedBy,
+			}
+
+			if err := tx.Create(&episodeSource).Error; err != nil {
+				return fmt.Errorf("błąd tworzenia episode source: %v", err)
+			}
+
+			fmt.Printf("  ✓ Utworzono episode source: %s (ID=%d)\n", episodeSource.SourceName, episodeSource.ID)
+		}
+
+		fmt.Println("✓ Dane testowe załadowane pomyślnie!")
+		return nil
+	})
 }
