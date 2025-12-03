@@ -18,9 +18,9 @@ function openMicrophoneAssignModal(sourceName, sceneName) {
 
 // Renderuj modal z listą Staff + Guests
 function renderMicrophoneModal(data, sourceName) {
-    const overlay = document.getElementById('microphone-modal-overlay');
-    const title = document.getElementById('microphone-modal-title');
-    const body = document.getElementById('microphone-modal-body');
+    const overlay = document.getElementById('microphoneModalOverlay');
+    const title = document.getElementById('microphoneModalTitle');
+    const body = document.getElementById('microphoneModalBody');
     
     title.textContent = `Przypisz osobę: ${sourceName}`;
     body.innerHTML = '';
@@ -161,19 +161,19 @@ function updateMicrophoneButtonText(sourceName, newText) {
 
 // Zamknij modal
 function closeMicrophoneModal() {
-    const overlay = document.getElementById('microphone-modal-overlay');
+    const overlay = document.getElementById('microphoneModalOverlay');
     overlay.classList.remove('active');
 }
 
 // Listener - zamknięcie modalu przez X
 document.addEventListener('DOMContentLoaded', () => {
-    const closeBtn = document.getElementById('microphone-modal-close');
+    const closeBtn = document.getElementById('microphoneModalClose');
     if (closeBtn) {
         closeBtn.addEventListener('click', closeMicrophoneModal);
     }
     
     // Zamknięcie przez kliknięcie poza modalem
-    const overlay = document.getElementById('microphone-modal-overlay');
+    const overlay = document.getElementById('microphoneModalOverlay');
     if (overlay) {
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {

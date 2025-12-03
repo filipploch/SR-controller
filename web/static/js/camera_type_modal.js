@@ -20,7 +20,7 @@ async function openCameraTypeModal(sourceName, sceneName) {
         const data = await response.json();
 
         renderCameraTypeModal(data, sourceName);
-        document.getElementById('camera-type-modal-overlay').classList.add('active');
+        document.getElementById('cameraTypeModalOverlay').classList.add('active');
     } catch (error) {
         console.error('Błąd ładowania typów kamer:', error);
         alert('Nie udało się załadować listy typów kamer');
@@ -29,8 +29,8 @@ async function openCameraTypeModal(sourceName, sceneName) {
 
 // Renderuj modal z listą typów
 function renderCameraTypeModal(data, sourceName) {
-    const modalCameraTypeTitle = document.getElementById('camera-type-modal-title');
-    const modalBody = document.getElementById('camera-type-modal-body');
+    const modalCameraTypeTitle = document.getElementById('cameraTypeModalTitle');
+    const modalBody = document.getElementById('cameraTypeModalBody');
 
     modalCameraTypeTitle.textContent = `Wybierz typ kamery - ${sourceName}`;
     modalBody.innerHTML = '';
@@ -168,7 +168,7 @@ async function disableCameraSource() {
 
 // Zamknij modal
 function closeCameraTypeModal() {
-    document.getElementById('camera-type-modal-overlay').classList.remove('active');
+    document.getElementById('cameraTypeModalOverlay').classList.remove('active');
     currentCameraModalSourceName = null;
     currentCameraModalSceneName = null;
 }
@@ -176,7 +176,7 @@ function closeCameraTypeModal() {
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
     // Zamknij modal po kliknięciu na overlay
-    const overlay = document.getElementById('camera-type-modal-overlay');
+    const overlay = document.getElementById('cameraTypeModalOverlay');
     if (overlay) {
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
@@ -186,7 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Zamknij modal po kliknięciu na X
-    const closeBtn = document.getElementById('camera-type-modal-close');
+    const closeBtn = document.getElementById('cameraTypeModalClose');
     if (closeBtn) {
         closeBtn.addEventListener('click', closeCameraTypeModal);
     }

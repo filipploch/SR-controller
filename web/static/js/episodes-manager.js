@@ -1,6 +1,6 @@
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
-    loadSeasons();
+    loadSeasonsForSelect();
     loadEpisodes();
     loadStaffTypes();
     loadGuestTypes();
@@ -129,7 +129,7 @@ function switchMediaSubTab(subTabName, sourceElement) {
 }
 
 // ===== SEASONS =====
-async function loadSeasons() {
+async function loadSeasonsForSelect() {
     try {
         const response = await fetch('/api/seasons');
         seasons = await response.json();
@@ -214,7 +214,7 @@ function renderEpisodes() {
     }).join('');
 }
 
-async function openCreateModal() {
+async function openCreateEpisodeModal() {
     document.getElementById('modalEpisodeTitle').textContent = 'Nowy Odcinek';
     document.getElementById('episodeForm').reset();
     document.getElementById('episodeId').value = '';
@@ -280,7 +280,7 @@ function openEditModal(id) {
     document.getElementById('episodeModal').classList.add('active');
 }
 
-async function closeModal() {
+async function closeEpisodeModal() {
     document.getElementById('episodeModal').classList.remove('active');
     
     // Przywróć currentEpisodeId do aktualnego odcinka
@@ -346,7 +346,7 @@ async function saveEpisode() {
         });
 
         if (response.ok) {
-            closeModal();
+            closeEpisodeModal();
             loadEpisodes();
         } else {
             const error = await response.text();
@@ -981,17 +981,17 @@ async function loadMediaFiles() {
     }
 }
 
-async function loadMediaFiles() {
-    if (!currentEpisodeId) return;
+// async function loadMediaFiles() {
+//     if (!currentEpisodeId) return;
     
-    try {
-        const response = await fetch(`/api/episodes/${currentEpisodeId}/media/files`);
-        availableMediaFiles = await response.json();
-        renderMediaFiles();
-    } catch (error) {
-        console.error('Błąd ładowania plików:', error);
-    }
-}
+//     try {
+//         const response = await fetch(`/api/episodes/${currentEpisodeId}/media/files`);
+//         availableMediaFiles = await response.json();
+//         renderMediaFiles();
+//     } catch (error) {
+//         console.error('Błąd ładowania plików:', error);
+//     }
+// }
 
 function renderMediaFiles() {
     const container = document.getElementById('mediaFilesGrid');

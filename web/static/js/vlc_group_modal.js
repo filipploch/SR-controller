@@ -19,7 +19,7 @@ async function openVLCGroupModal(sourceName, sceneName) {
         renderVLCGroupModal(data, sourceName, sceneName);
 
         // Pokaż modal
-        document.getElementById('vlc-group-modal-overlay').classList.add('active');
+        document.getElementById('vlcGroupModalOverlay').classList.add('active');
     } catch (error) {
         console.error('Błąd ładowania grup:', error);
         alert('Nie udało się załadować list grup');
@@ -28,10 +28,10 @@ async function openVLCGroupModal(sourceName, sceneName) {
 
 // Renderuj zawartość modalu
 function renderVLCGroupModal(data, sourceName, sceneName) {
-    const modalVLCGroupTitle = document.getElementById('vlc-group-modal-title');
+    const modalVLCGroupTitle = document.getElementById('vlcGroupModalTitle');
     modalVLCGroupTitle.textContent = `Wybierz grupę dla ${sourceName}`;
 
-    const modalBody = document.getElementById('vlc-group-modal-body');
+    const modalBody = document.getElementById('vlcGroupModalBody');
     modalBody.innerHTML = '';
 
     if (!data.groups || data.groups.length === 0) {
@@ -115,7 +115,7 @@ async function assignGroupToSource(groupId, groupName) {
 
 // Zamknij modal
 function closeVLCGroupModal() {
-    document.getElementById('vlc-group-modal-overlay').classList.remove('active');
+    document.getElementById('vlcGroupModalOverlay').classList.remove('active');
     currentVLCModalSourceName = null;
     vlcModalData = null;
 }
@@ -123,17 +123,17 @@ function closeVLCGroupModal() {
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
     // Zamknij modal po kliknięciu na overlay
-    const overlay = document.getElementById('vlc-group-modal-overlay');
+    const overlay = document.getElementById('vlcGroupModalOverlay');
     if (overlay) {
         overlay.addEventListener('click', (e) => {
-            if (e.target.id === 'vlc-group-modal-overlay') {
+            if (e.target.id === 'vlcGroupModalOverlay') {
                 closeVLCGroupModal();
             }
         });
     }
 
     // Zamknij modal po kliknięciu X
-    const closeBtn = document.getElementById('vlc-group-modal-close');
+    const closeBtn = document.getElementById('vlcGroupModalClose');
     if (closeBtn) {
         closeBtn.addEventListener('click', closeVLCGroupModal);
     }

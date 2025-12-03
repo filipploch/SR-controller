@@ -49,7 +49,7 @@ function renderCameraTypes() {
 }
 
 // Otwórz modal dodawania
-function openCameraTypeModal() {
+function openCameraTypeModalForManagement() {
     editingId = null;
     document.getElementById('modalCameraTitle').textContent = 'Nowy Typ Kamery';
     document.getElementById('cameraTypeForm').reset();
@@ -58,7 +58,7 @@ function openCameraTypeModal() {
 }
 
 // Zamknij modal
-function closeCameraTypeModal() {
+function closeCameraTypeEditModal() {
     document.getElementById('cameraTypeModal').classList.remove('active');
     editingId = null;
 }
@@ -117,7 +117,7 @@ async function saveCameraType(event) {
             throw new Error(error);
         }
 
-        closeCameraTypeModal();
+        closeCameraTypeEditModal();
         loadCameraTypes();
         
         const action = editingId ? 'zaktualizowano' : 'dodano';

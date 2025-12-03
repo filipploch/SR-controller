@@ -1,7 +1,7 @@
 //let seasons = [];
 
 // Ładowanie sezonów
-async function loadSeasons() {
+async function loadSeasonsForManagement() {
     try {
         const response = await fetch('/api/seasons');
         seasons = await response.json();
@@ -48,7 +48,7 @@ function renderSeasons() {
 }
 
 // Otwórz modal tworzenia
-async function openCreateModal() {
+async function openCreateSeasonModal() {
     document.getElementById('modalSeasonTitle').textContent = 'Nowy Sezon';
     document.getElementById('seasonForm').reset();
     document.getElementById('seasonId').value = '';
@@ -80,7 +80,7 @@ function openEditSeasonModal(id) {
 }
 
 // Zamknij modal
-function closeModal() {
+function closeSeasonModal() {
     document.getElementById('seasonModal').classList.remove('active');
 }
 
@@ -106,8 +106,8 @@ document.getElementById('seasonForm').addEventListener('submit', async (e) => {
         });
 
         if (response.ok) {
-            closeModal();
-            loadSeasons();
+            closeSeasonModal();
+            loadSeasonsForManagement();
         } else {
             alert('Błąd zapisu sezonu');
         }
@@ -127,7 +127,7 @@ async function setCurrentSeason(id) {
         });
 
         if (response.ok) {
-            loadSeasons();
+            loadSeasonsForManagement();
         } else {
             alert('Błąd ustawiania sezonu');
         }
@@ -147,7 +147,7 @@ async function deleteSeason(id) {
         });
 
         if (response.ok) {
-            loadSeasons();
+            loadSeasonsForManagement();
         } else {
             alert('Błąd usuwania sezonu');
         }
@@ -158,4 +158,4 @@ async function deleteSeason(id) {
 }
 
 // Inicjalizacja
-loadSeasons();
+loadSeasonsForManagement();

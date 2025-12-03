@@ -45,3 +45,6 @@ backup*.*
 
 # Plik z danymi testowymi
 test-data.json
+
+# pliki zip
+*.zip

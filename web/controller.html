@@ -57,10 +57,10 @@
             <!-- Panel KAMERY -->
             <div class="scene-panel" data-scene="KAMERY">
                 <h3>Kamery</h3>
-                <div class="sources-list" id="sources-kamery">
+                <div class="sources-list" id="sourcesKamery">
                     <div class="loading">Ładowanie...</div>
                 </div>
-                <button class="save-order-btn" id="save-kamery" onclick="saveSourceOrder('KAMERY')">💾 Zapisz</button>
+                <button class="save-order-btn" id="saveKamery" onclick="saveSourceOrder('KAMERY')">💾 Zapisz</button>
             </div>
 
             <!-- Panel z zakładkami MEDIA/REPORTAŻE -->
@@ -70,18 +70,18 @@
                     <button class="tab-btn" data-tab="reportaze" onclick="switchControllerTab('media-reportaze', 'reportaze')">Reportaże</button>
                 </div>
 
-                <div class="tab-content active" id="tab-media" data-scene="MEDIA">
-                    <div class="sources-list" id="sources-media">
+                <div class="tab-content active" id="tabMedia" data-scene="MEDIA">
+                    <div class="sources-list" id="sourcesMedia">
                         <div class="loading">Ładowanie...</div>
                     </div>
-                    <button class="save-order-btn" id="save-media" onclick="saveSourceOrder('MEDIA')">💾 Zapisz</button>
+                    <button class="save-order-btn" id="saveMedia" onclick="saveSourceOrder('MEDIA')">💾 Zapisz</button>
                 </div>
 
-                <div class="tab-content" id="tab-reportaze" data-scene="REPORTAZE">
-                    <div class="sources-list" id="sources-reportaze">
+                <div class="tab-content" id="tabReportaze" data-scene="REPORTAZE">
+                    <div class="sources-list" id="sourcesReportaze">
                         <div class="loading">Ładowanie...</div>
                     </div>
-                    <button class="save-order-btn" id="save-reportaze" onclick="saveSourceOrder('REPORTAZE')">💾 Zapisz</button>
+                    <button class="save-order-btn" id="saveReportaze" onclick="saveSourceOrder('REPORTAZE')">💾 Zapisz</button>
                 </div>
             </div>
 
@@ -92,18 +92,18 @@
                     <button class="tab-btn" data-tab="muzyka" onclick="switchControllerTab('mikrofony-muzyka', 'muzyka')">Muzyka</button>
                 </div>
 
-                <div class="tab-content active" id="tab-mikrofony" data-scene="MIKROFONY">
-                    <div class="sources-list" id="sources-mikrofony">
+                <div class="tab-content active" id="tabMikrofony" data-scene="MIKROFONY">
+                    <div class="sources-list" id="sourcesMikrofony">
                         <div class="loading">Ładowanie...</div>
                     </div>
-                    <button class="save-order-btn" id="save-mikrofony" onclick="saveSourceOrder('MIKROFONY')">💾 Zapisz</button>
+                    <button class="save-order-btn" id="saveMikrofony" onclick="saveSourceOrder('MIKROFONY')">💾 Zapisz</button>
                 </div>
 
-                <div class="tab-content" id="tab-muzyka" data-scene="MUZYKA">
-                    <div class="sources-list" id="sources-muzyka">
+                <div class="tab-content" id="tabMuzyka" data-scene="MUZYKA">
+                    <div class="sources-list" id="sourcesMuzyka">
                         <div class="loading">Ładowanie...</div>
                     </div>
-                    <button class="save-order-btn" id="save-muzyka" onclick="saveSourceOrder('MUZYKA')">💾 Zapisz</button>
+                    <button class="save-order-btn" id="saveMuzyka" onclick="saveSourceOrder('MUZYKA')">💾 Zapisz</button>
                 </div>
             </div>
         </div>
@@ -262,52 +262,52 @@
     
 
     <!-- Modal wyboru mediów -->
-    <div id="media-modal-overlay" class="media-modal-overlay">
+    <div id="mediaModalOverlay" class="media-modal-overlay">
         <div class="media-modal">
             <div class="media-modal-header">
-                <h3 id="media-modal-title">Wybierz media</h3>
-                <button id="media-modal-close" class="media-modal-close">×</button>
+                <h3 id="mediaModalTitle">Wybierz media</h3>
+                <button id="mediaModalClose" class="media-modal-close">×</button>
             </div>
-            <div id="media-modal-body" class="media-modal-body">
+            <div id="mediaModalBody" class="media-modal-body">
                 <!-- Zawartość generowana dynamicznie -->
             </div>
         </div>
     </div>
 
     <!-- Modal wyboru grupy VLC -->
-    <div id="vlc-group-modal-overlay" class="vlc-group-modal-overlay">
+    <div id="vlcGroupModalOverlay" class="vlc-group-modal-overlay">
         <div class="vlc-group-modal">
             <div class="vlc-group-modal-header">
-                <h3 id="vlc-group-modal-title">Wybierz grupę</h3>
-                <button id="vlc-group-modal-close" class="vlc-group-modal-close">×</button>
+                <h3 id="vlcGroupModalTitle">Wybierz grupę</h3>
+                <button id="vlcGroupModalClose" class="vlc-group-modal-close">×</button>
             </div>
-            <div id="vlc-group-modal-body" class="vlc-group-modal-body">
+            <div id="vlcGroupModalBody" class="vlc-group-modal-body">
                 <!-- Zawartość generowana dynamicznie -->
             </div>
         </div>
     </div>
 
     <!-- Modal wyboru typu kamery -->
-    <div id="camera-type-modal-overlay" class="camera-type-modal-overlay">
+    <div id="cameraTypeModalOverlay" class="camera-type-modal-overlay">
         <div class="camera-type-modal">
             <div class="camera-type-modal-header">
-                <h3 id="camera-type-modal-title">Wybierz typ kamery</h3>
-                <button id="camera-type-modal-close" class="camera-type-modal-close">×</button>
+                <h3 id="cameraTypeModalTitle">Wybierz typ kamery</h3>
+                <button id="cameraTypeModalClose" class="camera-type-modal-close">×</button>
             </div>
-            <div id="camera-type-modal-body" class="camera-type-modal-body">
+            <div id="cameraTypeModalBody" class="camera-type-modal-body">
                 <!-- Zawartość generowana dynamicznie -->
             </div>
         </div>
     </div>
 
     <!-- Modal przypisania osoby do mikrofonu -->
-    <div id="microphone-modal-overlay" class="microphone-modal-overlay">
+    <div id="microphoneModalOverlay" class="microphone-modal-overlay">
         <div class="microphone-modal">
             <div class="microphone-modal-header">
-                <h3 id="microphone-modal-title">Przypisz osobę</h3>
-                <button id="microphone-modal-close">×</button>
+                <h3 id="microphoneModalTitle">Przypisz osobę</h3>
+                <button id="microphoneModalClose">×</button>
             </div>
-            <div id="microphone-modal-body">
+            <div id="microphoneModalBody">
                 <!-- Zawartość generowana dynamicznie -->
             </div>
         </div>

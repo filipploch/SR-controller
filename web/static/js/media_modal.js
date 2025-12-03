@@ -30,7 +30,7 @@ async function openMediaModal(sourceName, sceneName) {
         modalData = await response.json();
 
         renderMediaModal(modalData, sourceName, sceneName);
-        document.getElementById('media-modal-overlay').classList.add('active');
+        document.getElementById('mediaModalOverlay').classList.add('active');
     } catch (error) {
         console.error('Błąd ładowania danych modalu:', error);
         alert('Nie udało się załadować listy mediów');
@@ -39,8 +39,8 @@ async function openMediaModal(sourceName, sceneName) {
 
 // Renderuj modal
 function renderMediaModal(data, sourceName, sceneName) {
-    const modalBody = document.getElementById('media-modal-body');
-    const modalMediaTitle = document.getElementById('media-modal-title');
+    const modalBody = document.getElementById('mediaModalBody');
+    const modalMediaTitle = document.getElementById('mediaModalTitle');
 
     modalMediaTitle.textContent = `Wybierz media dla ${sourceName} (${sceneName})`;
     modalBody.innerHTML = '';
@@ -131,7 +131,7 @@ function toggleMediaGroup(groupId) {
         allGroups.forEach(g => g.classList.remove('expanded'));
 
         // 2. Przenieś klikniętą grupę pod pierwszą (jeśli nie jest pierwsza)
-        const modalBody = document.getElementById('media-modal-body');
+        const modalBody = document.getElementById('mediaModalBody');
         const firstGroup = modalBody.firstChild;
 
         if (clickedGroup !== firstGroup) {
@@ -189,7 +189,7 @@ async function assignMediaToSource(mediaId, mediaTitle) {
 
 // Zamknij modal
 function closeMediaModal() {
-    document.getElementById('media-modal-overlay').classList.remove('active');
+    document.getElementById('mediaModalOverlay').classList.remove('active');
     currentModalSourceName = null;
     modalData = null;
 }
@@ -403,14 +403,14 @@ function updateCameraButtonState(sourceName, cameraTypeName, isDisabled) {
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
     // Zamknij modal po kliknięciu na overlay
-    document.getElementById('media-modal-overlay').addEventListener('click', (e) => {
-        if (e.target.id === 'media-modal-overlay') {
+    document.getElementById('mediaModalOverlay').addEventListener('click', (e) => {
+        if (e.target.id === 'mediaModalOverlay') {
             closeMediaModal();
         }
     });
 
     // Zamknij modal po kliknięciu X
-    document.getElementById('media-modal-close').addEventListener('click', closeMediaModal);
+    document.getElementById('mediaModalClose').addEventListener('click', closeMediaModal);
 });
 
 // Załaduj aktualny odcinek przy połączeniu

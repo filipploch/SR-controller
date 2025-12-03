@@ -52,21 +52,25 @@ function showContentWindow(contentWindow) {
 	}else{
 		openSettingsDiv.textContent = "⚙️ Ustawienia";
 		openSettingsDiv.addEventListener('click', function() {showContentWindow("settingsWindow");});
+		
+		// Odśwież przypisania gdy wracamy do kontrolera
 		if (typeof loadAllSourceAssignments === 'function') {
-            loadAllSourceAssignments();
+			loadAllSourceAssignments();
 		}
+		// Przełącz zakładki aby odświeżyć widoki
 		if (typeof switchControllerTab === 'function') {
-            switchControllerTab('media-reportaze', 'media');
+			switchControllerTab('media-reportaze', 'media');
 			switchControllerTab('mikrofony-muzyka', 'mikrofony');
 		}
-		
 	}
 }
 
 // Funkcje przełączania zakładek
 function switchControllerTab(group, tabName) {
     const tabButton = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
-    const tabContent = document.getElementById(`tab-${tabName}`);
+    // Konwersja na camelCase: tab-media -> tabMedia
+    const tabId = 'tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1);
+    const tabContent = document.getElementById(tabId);
     
     if (!tabButton || !tabContent) return;
     
@@ -148,7 +152,9 @@ function loadAllScenes() {
 
 function detectActiveScene() {
 	MAIN_SCENES.forEach(sceneName => {
-		const containerId = `sources-${sceneName.toLowerCase()}`;
+		// Konwersja na camelCase: sources-media -> sourcesMedia
+		const sceneLower = sceneName.toLowerCase();
+		const containerId = 'sources' + sceneLower.charAt(0).toUpperCase() + sceneLower.slice(1);
 		const container = document.getElementById(containerId);
 		if (container) {
 			const activeButton = container.querySelector('.source-btn.active');
@@ -190,7 +196,9 @@ function loadSceneSources(sceneName) {
 }
 
 function showSaveButton(sceneName) {
-	const buttonId = `save-${sceneName.toLowerCase()}`;
+	// Konwersja na camelCase: save-media -> saveMedia
+	const sceneLower = sceneName.toLowerCase();
+	const buttonId = 'save' + sceneLower.charAt(0).toUpperCase() + sceneLower.slice(1);
 	const button = document.getElementById(buttonId);
 	if (button) {
 		button.classList.add('visible');
@@ -198,7 +206,9 @@ function showSaveButton(sceneName) {
 }
 
 function hideSaveButton(sceneName) {
-	const buttonId = `save-${sceneName.toLowerCase()}`;
+	// Konwersja na camelCase: save-media -> saveMedia
+	const sceneLower = sceneName.toLowerCase();
+	const buttonId = 'save' + sceneLower.charAt(0).toUpperCase() + sceneLower.slice(1);
 	const button = document.getElementById(buttonId);
 	if (button) {
 		button.classList.remove('visible');
@@ -216,7 +226,9 @@ function saveSourceOrder(sceneName) {
 }
 
 async function renderSources(sceneName, sources) {
-	const containerId = `sources-${sceneName.toLowerCase()}`;
+	// Konwersja na camelCase: sources-media -> sourcesMedia
+	const sceneLower = sceneName.toLowerCase();
+	const containerId = 'sources' + sceneLower.charAt(0).toUpperCase() + sceneLower.slice(1);
 	const container = document.getElementById(containerId);
 	
 	if (!container) return;
@@ -381,7 +393,9 @@ function manageMicrophones(sceneName) {
 
 function turnOffAllMainScenes(exceptScene, exceptSource) {
 	MAIN_SCENES.forEach(sceneName => {
-		const containerId = `sources-${sceneName.toLowerCase()}`;
+		// Konwersja na camelCase: sources-media -> sourcesMedia
+		const sceneLower = sceneName.toLowerCase();
+		const containerId = 'sources' + sceneLower.charAt(0).toUpperCase() + sceneLower.slice(1);
 		const container = document.getElementById(containerId);
 		if (!container) return;
 		
@@ -410,7 +424,9 @@ function toggleSource(sceneName, sourceName, visible) {
 }
 
 function updateSourceButton(sceneName, sourceName, visible) {
-	const containerId = `sources-${sceneName.toLowerCase()}`;
+	// Konwersja na camelCase: sources-media -> sourcesMedia
+	const sceneLower = sceneName.toLowerCase();
+	const containerId = 'sources' + sceneLower.charAt(0).toUpperCase() + sceneLower.slice(1);
 	const container = document.getElementById(containerId);
 	if (!container) return;
 	
