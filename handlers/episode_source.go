@@ -785,7 +785,7 @@ func (h *EpisodeSourceHandler) GetCameraTypesForModal(w http.ResponseWriter, r *
 // GetMicrophonePeopleList zwraca listę Staff + Guests dla modalu mikrofonów
 func (h *EpisodeSourceHandler) GetMicrophonePeopleList(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	episodeID, err := strconv.Atoi(vars["id"])
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
 	if err != nil {
 		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
 		return
@@ -898,7 +898,7 @@ func (h *EpisodeSourceHandler) GetMicrophonePeopleList(w http.ResponseWriter, r 
 // AssignMicrophonePerson przypisuje osobę (staff/guest) do mikrofonu
 func (h *EpisodeSourceHandler) AssignMicrophonePerson(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	episodeID, err := strconv.Atoi(vars["id"])
+	episodeID, err := strconv.ParseUint(vars["episode_id"], 10, 32)
 	if err != nil {
 		http.Error(w, "Invalid episode ID", http.StatusBadRequest)
 		return
