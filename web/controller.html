@@ -6,6 +6,7 @@
     <title>Kontroler OBS</title>
     <link rel="stylesheet" href="/static/css/shared.css">
     <link rel="stylesheet" href="/static/css/controller.css">
+    <link rel="stylesheet" href="/static/css/settings.css">
     <link rel="stylesheet" href="/static/css/media_modal.css">
     <link rel="stylesheet" href="/static/css/vlc_group_modal.css">
     <link rel="stylesheet" href="/static/css/camera_type_modal.css">
@@ -114,8 +115,6 @@
                     
                     <button onclick="showContentWindow('seasonsWindow');" class="nav-link">📅 Sezony</button>
                     <button onclick="showContentWindow('episodesWindow');" class="nav-link">🎬 Odcinki</button>
-                    <button onclick="showContentWindow('staffWindow');" class="nav-link">👥 Ekipa</button>
-                    <button onclick="showContentWindow('guestsWindow');" class="nav-link">🎤 Goście</button>
                     <button onclick="showContentWindow('camerasWindow');" class="nav-link">📹 Kamery</button>
                 </div>
             </div>
@@ -180,52 +179,6 @@
                         </tr>
                     </tbody>
                 </table>
-            </div>
-        </div>
-        <div id="guestsWindow" class="content-window hidden">
-            <!-- Panel typów -->
-            <div class="panel">
-                <div class="panel-header">
-                    <h2>Typy Gości</h2>
-                    <button class="btn btn-primary btn-small" onclick="openTypeModal()">+ Typ</button>
-                </div>
-                <div class="scrollable" id="guestTypesContainer">
-                    <div class="loading">Ładowanie...</div>
-                </div>
-            </div>
-
-            <!-- Panel gości -->
-            <div class="panel" style="flex: 2;">
-                <div class="panel-header">
-                    <h2>Goście</h2>
-                    <button class="btn btn-primary btn-small" onclick="openGuestModal()">+ Gość</button>
-                </div>
-                <div class="scrollable" id="guestsContainer">
-                    <div class="loading">Ładowanie...</div>
-                </div>
-            </div>
-        </div>
-        <div id="staffWindow" class="content-window hidden">
-            <!-- Panel typów -->
-            <div class="panel">
-                <div class="panel-header">
-                    <h2>Typy Ekipy</h2>
-                    <button class="btn btn-primary btn-small" onclick="openTypeModal()">+ Typ</button>
-                </div>
-                <div class="scrollable" id="staffTypesContainer">
-                    <div class="loading">Ładowanie...</div>
-                </div>
-            </div>
-
-            <!-- Panel pracowników -->
-            <div class="panel" style="flex: 2;">
-                <div class="panel-header">
-                    <h2>Członkowie Ekipy</h2>
-                    <button class="btn btn-primary btn-small" onclick="openStaffModal()">+ Osoba</button>
-                </div>
-                <div class="scrollable" id="staffContainer">
-                    <div class="loading">Ładowanie...</div>
-                </div>
             </div>
         </div>
         <div id="camerasWindow" class="content-window hidden">
@@ -563,12 +516,6 @@
             </div>
             <form id="addGuestForm">
                 <div class="form-group">
-                    <label for="guestType">Typ</label>
-                    <select class="form-control" id="guestType">
-                        <option value="">Wybierz typ...</option>
-                    </select>
-                </div>
-                <div class="form-group">
                     <label for="guestFirstName">Imię *</label>
                     <input type="text" class="form-control" id="guestFirstName" required>
                 </div>
@@ -691,12 +638,13 @@
                     <div style="padding: 8px; background: #1a1a1a; border-radius: 4px; font-size: 12px;" id="editGuestName"></div>
                 </div>
                 <div class="form-group">
-                    <label for="editGuestTopic">Temat</label>
-                    <input type="text" class="form-control" id="editGuestTopic">
-                </div>
-                <div class="form-group">
-                    <label for="editGuestOrder">Kolejność</label>
-                    <input type="number" class="form-control" id="editGuestOrder" value="1" min="1">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label for="editGuestTypeSelect">Typ Gościa</label>
+                        <button type="button" class="btn btn-secondary btn-small" onclick="openAddGuestTypeModalFromEdit()">+ Nowy Typ</button>
+                    </div>
+                    <select class="form-control" id="editGuestTypeSelect">
+                        <option value="">Wybierz typ...</option>
+                    </select>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeEditGuestModal()">Anuluj</button>

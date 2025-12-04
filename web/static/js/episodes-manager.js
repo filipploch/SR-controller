@@ -689,16 +689,10 @@ async function loadGuestTypes() {
     try {
         const response = await fetch('/api/guest-types');
         guestTypes = await response.json();
-        updateGuestTypeSelect();
+        // updateGuestTypeSelect(); - USUNIĘTE: select już nie istnieje w modalu
     } catch (error) {
         console.error('Błąd ładowania typów gości:', error);
     }
-}
-
-function updateGuestTypeSelect() {
-    const select = document.getElementById('guestType');
-    select.innerHTML = '<option value="">Wybierz typ...</option>' +
-        guestTypes.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
 }
 
 async function loadAllGuests() {
@@ -839,15 +833,10 @@ function closeAddGuestModal() {
 }
 
 async function createGuest() {
-    const typeId = document.getElementById('guestType').value;
     const data = {
         first_name: document.getElementById('guestFirstName').value,
         last_name: document.getElementById('guestLastName').value
     };
-    
-    if (typeId) {
-        data.guest_type_id = parseInt(typeId);
-    }
 
     try {
         const response = await fetch('/api/guests', {
@@ -875,7 +864,17 @@ function openAddGuestTypeModal() {
 }
 
 function closeAddGuestTypeModal() {
-    document.getElementById('addGuestTypeModal').classList.remove('active');
+    const modal = document.getElementById('addGuestTypeModal');
+    const fromEdit = modal.dataset.fromEdit === 'true';
+    modal.classList.remove('active');
+    delete modal.dataset.fromEdit;
+    
+    // Jeśli otwarto z edycji, wróć do modala edycji
+    if (fromEdit) {
+        setTimeout(() => {
+            document.getElementById('editGuestModal').classList.add('active');
+        }, 100);
+    }
 }
 
 async function createGuestType() {
@@ -891,8 +890,18 @@ async function createGuestType() {
         });
 
         if (response.ok) {
+            const newType = await response.json();
+            const fromEdit = document.getElementById('addGuestTypeModal').dataset.fromEdit === 'true';
+            
             closeAddGuestTypeModal();
             await loadGuestTypes();
+            
+            // Jeśli z edycji, ustaw nowo dodany typ
+            if (fromEdit) {
+                setTimeout(() => {
+                    document.getElementById('editGuestTypeSelect').value = newType.id;
+                }, 150);
+            }
         } else {
             const error = await response.text();
             alert('Błąd dodawania typu: ' + error);
@@ -903,6 +912,12 @@ async function createGuestType() {
     }
 }
 
+function openAddGuestTypeModalFromEdit() {
+    // Zapamiętaj że jesteśmy w trybie edycji
+    document.getElementById('addGuestTypeModal').dataset.fromEdit = 'true';
+    openAddGuestTypeModal();
+}
+
 function openEditGuestModal(assignmentId) {
     const assignment = assignedGuests.find(a => a.id === assignmentId);
     if (!assignment) return;
@@ -910,8 +925,16 @@ function openEditGuestModal(assignmentId) {
     document.getElementById('editGuestAssignmentId').value = assignmentId;
     document.getElementById('editGuestName').textContent = 
         `${assignment.guest.first_name} ${assignment.guest.last_name}`;
-    document.getElementById('editGuestTopic').value = assignment.topic || '';
-    document.getElementById('editGuestOrder').value = assignment.segment_order || 1;
+    
+    // Wypełnij select typów gości
+    const select = document.getElementById('editGuestTypeSelect');
+    select.innerHTML = '<option value="">Wybierz typ...</option>' +
+        guestTypes.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+    
+    // Ustaw aktualny typ gościa
+    if (assignment.guest.guest_type_id) {
+        select.value = assignment.guest.guest_type_id;
+    }
     
     document.getElementById('editGuestModal').classList.add('active');
 }
@@ -922,16 +945,24 @@ function closeEditGuestModal() {
 
 async function updateGuestAssignment() {
     const assignmentId = document.getElementById('editGuestAssignmentId').value;
+    const assignment = assignedGuests.find(a => a.id === parseInt(assignmentId));
+    if (!assignment) return;
+    
+    const typeId = document.getElementById('editGuestTypeSelect').value;
+    
+    // Aktualizuj typ gościa (w tabeli guests, nie episode_guests)
     const data = {
-        topic: document.getElementById('editGuestTopic').value,
-        segment_order: parseInt(document.getElementById('editGuestOrder').value)
+        guest_type_id: typeId ? parseInt(typeId) : null
     };
 
     try {
-        const response = await fetch(`/api/episodes/${currentEpisodeId}/guests/${assignmentId}`, {
+        const response = await fetch(`/api/guests/${assignment.guest_id}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(data)
+            body: JSON.stringify({
+                ...assignment.guest,
+                guest_type_id: typeId ? parseInt(typeId) : null
+            })
         });
 
         if (response.ok) {

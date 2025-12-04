@@ -87,13 +87,13 @@ type GuestType struct {
 
 // Guest reprezentuje gościa
 type Guest struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	GuestTypeID uint      `gorm:"index" json:"guest_type_id"`
-	GuestType   GuestType `gorm:"foreignKey:GuestTypeID" json:"guest_type"`
-	FirstName   string    `gorm:"size:100;not null" json:"first_name"`
-	LastName    string    `gorm:"size:100;not null" json:"last_name"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          uint       `gorm:"primaryKey" json:"id"`
+	GuestTypeID *uint      `gorm:"index" json:"guest_type_id"`
+	GuestType   *GuestType `gorm:"foreignKey:GuestTypeID" json:"guest_type,omitempty"`
+	FirstName   string     `gorm:"size:100;not null" json:"first_name"`
+	LastName    string     `gorm:"size:100;not null" json:"last_name"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // CameraType reprezentuje typ kamery (np. Centralna, Prowadzący, Goście, Dodatkowa)
@@ -108,14 +108,15 @@ type CameraType struct {
 
 // EpisodeGuest reprezentuje przypisanie gościa do odcinka
 type EpisodeGuest struct {
-	ID           uint      `gorm:"primaryKey" json:"id"`
-	EpisodeID    uint      `gorm:"index;not null" json:"episode_id"`
-	Episode      Episode   `gorm:"foreignKey:EpisodeID" json:"episode"`
-	GuestID      uint      `gorm:"index;not null" json:"guest_id"`
-	Guest        Guest     `gorm:"foreignKey:GuestID" json:"guest"`
-	Topic        string    `gorm:"size:500" json:"topic"` // Temat rozmowy z tym gościem
-	SegmentOrder int       `json:"segment_order"`         // Kolejność wystąpienia w odcinku
-	CreatedAt    time.Time `json:"created_at"`
+	ID           uint       `gorm:"primaryKey" json:"id"`
+	EpisodeID    uint       `gorm:"index;not null" json:"episode_id"`
+	Episode      Episode    `gorm:"foreignKey:EpisodeID" json:"episode"`
+	GuestID      uint       `gorm:"index;not null" json:"guest_id"`
+	Guest        Guest      `gorm:"foreignKey:GuestID" json:"guest"`
+	GuestTypeID  *uint      `gorm:"index" json:"guest_type_id"`                         // ← DODAJ
+	GuestType    *GuestType `gorm:"foreignKey:GuestTypeID" json:"guest_type,omitempty"` // ← DODAJ
+	SegmentOrder int        `json:"segment_order"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 // MediaGroup reprezentuje grupę mediów dla odcinka
@@ -1083,8 +1084,10 @@ type TestGuest struct {
 }
 
 type TestEpisodeGuest struct {
-	EpisodeID int `json:"episode_id"`
-	GuestID   int `json:"guest_id"`
+	EpisodeID    int `json:"episode_id"`
+	GuestID      int `json:"guest_id"`
+	GuestTypeID  int `json:"guest_type_id"` // ← DODAJ
+	SegmentOrder int `json:"segment_order"`
 }
 
 type TestScene struct {
@@ -1297,9 +1300,14 @@ func LoadTestDataIfEmpty(db *gorm.DB) error {
 		// 7. Załaduj guests
 		for idx, testGuest := range testData.Guests {
 			guest := Guest{
-				GuestTypeID: guestTypeIDs[testGuest.GuestTypeID],
-				FirstName:   testGuest.FirstName,
-				LastName:    testGuest.LastName,
+				FirstName: testGuest.FirstName,
+				LastName:  testGuest.LastName,
+			}
+
+			// Ustaw GuestTypeID tylko jeśli jest podany w test-data.json
+			if testGuest.GuestTypeID != 0 {
+				typeID := guestTypeIDs[testGuest.GuestTypeID]
+				guest.GuestTypeID = &typeID
 			}
 
 			if err := tx.Create(&guest).Error; err != nil {
@@ -1307,14 +1315,25 @@ func LoadTestDataIfEmpty(db *gorm.DB) error {
 			}
 
 			guestIDs[idx+1] = guest.ID
-			fmt.Printf("  ✓ Utworzono guest: %s %s (ID=%d)\n", guest.FirstName, guest.LastName, guest.ID)
+			if guest.GuestTypeID != nil {
+				fmt.Printf("  ✓ Utworzono guest: %s %s (Type ID=%d, ID=%d)\n", guest.FirstName, guest.LastName, *guest.GuestTypeID, guest.ID)
+			} else {
+				fmt.Printf("  ✓ Utworzono guest: %s %s (bez typu, ID=%d)\n", guest.FirstName, guest.LastName, guest.ID)
+			}
 		}
 
 		// 8. Załaduj episode_guests
 		for _, testEpisodeGuest := range testData.EpisodeGuests {
 			episodeGuest := EpisodeGuest{
-				EpisodeID: episodeIDs[testEpisodeGuest.EpisodeID],
-				GuestID:   guestIDs[testEpisodeGuest.GuestID],
+				EpisodeID:    episodeIDs[testEpisodeGuest.EpisodeID],
+				GuestID:      guestIDs[testEpisodeGuest.GuestID],
+				SegmentOrder: testEpisodeGuest.SegmentOrder,
+			}
+
+			// Ustaw GuestTypeID tylko jeśli podano
+			if testEpisodeGuest.GuestTypeID != 0 {
+				typeID := guestTypeIDs[testEpisodeGuest.GuestTypeID]
+				episodeGuest.GuestTypeID = &typeID
 			}
 
 			if err := tx.Create(&episodeGuest).Error; err != nil {

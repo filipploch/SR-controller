@@ -73,11 +73,13 @@ func (h *GuestHandler) CreateGuest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Sprawdź czy typ istnieje
-	var guestType models.GuestType
-	if err := h.DB.First(&guestType, guest.GuestTypeID).Error; err != nil {
-		http.Error(w, "GuestType not found", http.StatusBadRequest)
-		return
+	// Sprawdź czy typ istnieje (tylko jeśli podano)
+	if guest.GuestTypeID != nil {
+		var guestType models.GuestType
+		if err := h.DB.First(&guestType, *guest.GuestTypeID).Error; err != nil {
+			http.Error(w, "GuestType not found", http.StatusBadRequest)
+			return
+		}
 	}
 
 	if err := h.DB.Create(&guest).Error; err != nil {
@@ -118,11 +120,13 @@ func (h *GuestHandler) UpdateGuest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Sprawdź czy typ istnieje
-	var guestType models.GuestType
-	if err := h.DB.First(&guestType, updateData.GuestTypeID).Error; err != nil {
-		http.Error(w, "GuestType not found", http.StatusBadRequest)
-		return
+	// Sprawdź czy typ istnieje (tylko jeśli podano)
+	if updateData.GuestTypeID != nil {
+		var guestType models.GuestType
+		if err := h.DB.First(&guestType, *updateData.GuestTypeID).Error; err != nil {
+			http.Error(w, "GuestType not found", http.StatusBadRequest)
+			return
+		}
 	}
 
 	guest.GuestTypeID = updateData.GuestTypeID

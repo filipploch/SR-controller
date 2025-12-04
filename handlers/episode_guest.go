@@ -52,9 +52,9 @@ func (h *EpisodeGuestHandler) AddGuestToEpisode(w http.ResponseWriter, r *http.R
 	}
 
 	var data struct {
-		GuestID      uint   `json:"guest_id"`
-		Topic        string `json:"topic"`
-		SegmentOrder int    `json:"segment_order"`
+		GuestID      uint  `json:"guest_id"`
+		GuestTypeID  *uint `json:"guest_type_id"`
+		SegmentOrder int   `json:"segment_order"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
@@ -86,7 +86,7 @@ func (h *EpisodeGuestHandler) AddGuestToEpisode(w http.ResponseWriter, r *http.R
 	episodeGuest := models.EpisodeGuest{
 		EpisodeID:    uint(episodeID),
 		GuestID:      data.GuestID,
-		Topic:        data.Topic,
+		GuestTypeID:  data.GuestTypeID,
 		SegmentOrder: data.SegmentOrder,
 	}
 
@@ -129,8 +129,8 @@ func (h *EpisodeGuestHandler) UpdateEpisodeGuest(w http.ResponseWriter, r *http.
 	}
 
 	var updateData struct {
-		Topic        string `json:"topic"`
-		SegmentOrder int    `json:"segment_order"`
+		GuestTypeID  *uint `json:"guest_type_id"`
+		SegmentOrder int   `json:"segment_order"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
@@ -138,7 +138,7 @@ func (h *EpisodeGuestHandler) UpdateEpisodeGuest(w http.ResponseWriter, r *http.
 		return
 	}
 
-	episodeGuest.Topic = updateData.Topic
+	episodeGuest.GuestTypeID = updateData.GuestTypeID
 	episodeGuest.SegmentOrder = updateData.SegmentOrder
 
 	if err := h.DB.Save(&episodeGuest).Error; err != nil {
