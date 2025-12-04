@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/static/css/media_modal.css">
     <link rel="stylesheet" href="/static/css/vlc_group_modal.css">
     <link rel="stylesheet" href="/static/css/camera_type_modal.css">
+    <link rel="stylesheet" href="/static/css/cameras.css">
     <link rel="stylesheet" href="/static/css/microphone_modal.css">
 </head>
 <body>
@@ -713,6 +714,30 @@
         </div>
     </div>
 
+    <!-- Modal dodawania/edycji typu kamery -->
+    <div class="modal" id="cameraTypeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalCameraTitle">Nowy Typ Kamery</h2>
+                <button type="button" class="modal-close" onclick="closeCameraTypeEditModal()">&times;</button>
+            </div>
+            <form id="cameraTypeForm" onsubmit="saveCameraType(event)">
+                <input type="hidden" id="cameraTypeId">
+                
+                <div class="form-group">
+                    <label for="cameraTypeName">Nazwa typu *</label>
+                    <input type="text" class="form-control" id="cameraTypeName" required>
+                    <small style="color: #888; font-size: 9px;">Np. "Tablica", "PTZ Sala", "Mobilna"</small>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeCameraTypeEditModal()">Anuluj</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="/static/js/socket.io.min.js"></script>
     <script src="/static/js/controller.js"></script>
     <script src="/static/js/settings.js"></script>
@@ -723,5 +748,6 @@
     <script src="/static/js/camera_type_modal.js"></script>
     <script src="/static/js/microphone_modal.js"></script>
     <script src="/static/js/volume_control.js"></script>
+    <script src="/static/js/cameras.js"></script>
 </body>
 </html>
