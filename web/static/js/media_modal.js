@@ -415,14 +415,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Załaduj aktualny odcinek przy połączeniu
 socket.on('connect', () => {
-    loadCurrentEpisode().then(() => {
-        // Automatycznie przypisz Media1/Reportaze1 i Media2/Reportaze2
-        // (renderSources wywoła loadAllSourceAssignments() po wyrenderowaniu przycisków)
-        autoAssignMediaSources().then(() => {
-            autoAssignVLCSources().then(() => {
-                // autoAssignCameraTypes();
-                loadCameraAssignments()
-            });
-        });
-    });
+    loadCurrentEpisode();
 });

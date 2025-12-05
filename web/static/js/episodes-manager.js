@@ -86,7 +86,8 @@ function switchEpisodeTab(tabName, sourceElement) {
     document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.remove('active');
     });
-    document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.add('active');
+    console.log("DZIWNY LOG: ", 'tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1))
+    document.getElementById('episodeTab' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.add('active');
 
     // Load data when switching to specific tabs
     if (tabName === 'staff') {
@@ -120,6 +121,7 @@ function switchMediaSubTab(subTabName, sourceElement) {
     
     // Pokaż wybraną pod-zakładkę
     const contentId = 'mediaSubTab' + subTabName.charAt(0).toUpperCase() + subTabName.slice(1);
+    console.log("contentId: ", contentId);
     document.getElementById(contentId).classList.add('active');
     
     // Zaznacz przycisk
